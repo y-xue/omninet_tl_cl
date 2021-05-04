@@ -37,7 +37,7 @@ run() {
 	--all_seed $((all_seed[$all_seed_i])) --data_seed $((all_seed[$all_seed_i])) \
 	--rewarding --ewc_lambda $l1 $l2 $l3 $l4 $l5 --full_seq ${seq} \
 	--converge_window ${converge_window} --safe_window ${safe_window} --restore_opt_lr \
-	--init_lr $all_seed_init_lr > /mmcl_random_seq_${seq}_count_repeat${n_iter}_ewc_all_other_tasks_${max_iter}_early_stop_cw${converge_window}_sw${safe_window}_restore_optimizer_lr_${l1}_${l2}_${l3}_${l4}_${l5}ewc_lambda_lr${init_lr}_${bs}bs_${n_iter}it_${eval_intvl}eval_intvl_allseed$((all_seed[$all_seed_i]))_dataseed$((all_seed[$all_seed_i])).log 2> /mmcl_random_seq_${seq}_count_repeat${n_iter}_ewc_all_other_tasks_${max_iter}_early_stop_cw${converge_window}_sw${safe_window}_restore_optimizer_lr_${l1}_${l2}_${l3}_${l4}_${l5}ewc_lambda_lr${init_lr}_${bs}bs_${n_iter}it_${eval_intvl}eval_intvl_allseed$((all_seed[$all_seed_i]))_dataseed$((all_seed[$all_seed_i])).err;
+	--init_lr $init_lr > /mmcl_random_seq_${seq}_count_repeat${n_iter}_ewc_all_other_tasks_${max_iter}_early_stop_cw${converge_window}_sw${safe_window}_restore_optimizer_lr_${l1}_${l2}_${l3}_${l4}_${l5}ewc_lambda_lr${init_lr}_${bs}bs_${n_iter}it_${eval_intvl}eval_intvl_allseed$((all_seed[$all_seed_i]))_dataseed$((all_seed[$all_seed_i])).log 2> /mmcl_random_seq_${seq}_count_repeat${n_iter}_ewc_all_other_tasks_${max_iter}_early_stop_cw${converge_window}_sw${safe_window}_restore_optimizer_lr_${l1}_${l2}_${l3}_${l4}_${l5}ewc_lambda_lr${init_lr}_${bs}bs_${n_iter}it_${eval_intvl}eval_intvl_allseed$((all_seed[$all_seed_i]))_dataseed$((all_seed[$all_seed_i])).err;
 }
 
 
