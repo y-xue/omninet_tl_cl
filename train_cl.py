@@ -81,6 +81,7 @@ parser.add_argument('--init_lr', default=0.02, type=float, help='init_lr')
 parser.add_argument('--n_warmup_steps', default=3000, type=float, help='n_warmup_steps for ScheduledOptim')
 # parser.add_argument('--ewc_lambda', default=0.4, type=float, help='hyperparameter of EWC')
 parser.add_argument('--ewc_lambda', default=[0.4], nargs='+', type=float, help='hyperparameter of EWC')
+parser.add_argument('--scale_ewc_lambda', default=[1], nargs='+', type=int, help='scale ewc_lambda')
 parser.add_argument('--full_seq', default='ITTIV', help='order of modalities')
 
 parser.add_argument('--restore_cl', default=-1, help='Step from which to restore model training')
@@ -198,6 +199,10 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 
 	log_str = ''
 	current_modality = args.full_seq[task_id % len(args.full_seq)]
+	if current_modality == 'V':
+		safe_window = 10
+	else:
+		safe_window = args.safe_window
 
 	if task == 'mm_ITV_CL':
 		with open(os.path.join(mm_dir, sample_idx_fn), 'rb') as f:
@@ -901,6 +906,16 @@ if __name__ == '__main__':
 	else:
 		ewc_lambda = args.ewc_lambda
 
+	if len(args.scale_ewc_lambda) == 1:
+		ewc_scales = args.scale_ewc_lambda * n_iters
+	else:
+		ewc_scales = args.scale_ewc_lambda
+
+	if len(args.n_warmup_steps) == 1:
+		n_warmup_steps = args.n_warmup_steps * len(args.full_seq)
+	else:
+		n_warmup_steps = args.n_warmup_steps
+
 	for k in range(restore_cl, n_iters):
 		for task_category_id, seq_lst in enumerate(cl_tasks):
 			task_id = k*len(args.full_seq) + task_category_id
@@ -926,7 +941,8 @@ if __name__ == '__main__':
 					 args.sample_idx_fn, seq_lst, args.rewarding, 
 					 args.random_seq, notest, test, test_on_val,
 					 args.use_sgd,
-					 task_id, ewc_lambda[task_category_id], args.full_seq, None, None) #int(args.all_seed)+k) 
+					 task_id, ewc_lambda[task_category_id]*ewc_scales[k], 
+					 args.full_seq, None, None) #int(args.all_seed)+k) 
 					 # use args.all_seed+k to set a different seed for dataloader in a different pass
 					 # set to None for same seed
 
@@ -965,7 +981,8 @@ if __name__ == '__main__':
 							 args.sample_idx_fn, seq_lst_test, args.rewarding,
 							 args.random_seq, notest, test, test_on_val,
 							 args.use_sgd,
-							 task_category_id_test, ewc_lambda[task_category_id], args.full_seq,
+							 task_category_id_test, ewc_lambda[task_category_id]*ewc_scales[k], 
+							 args.full_seq,
 							 counting_reward_dict, None)
 
 			with open(args.model_save_path + '/current_iterations.pkl', 'wb') as f:
