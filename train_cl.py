@@ -78,10 +78,11 @@ parser.add_argument('--test_on_val', action='store_true', help='True if only tes
 # parser.add_argument('--evaluate', action='store_true', help='True if only eval model.')
 parser.add_argument('--use_sgd', action='store_true', help='True if use SGD.')
 parser.add_argument('--init_lr', default=0.02, type=float, help='init_lr')
-parser.add_argument('--n_warmup_steps', default=3000, type=float, help='n_warmup_steps for ScheduledOptim')
+parser.add_argument('--n_warmup_steps', default=[3000], nargs='+', type=float, help='n_warmup_steps for ScheduledOptim')
 # parser.add_argument('--ewc_lambda', default=0.4, type=float, help='hyperparameter of EWC')
 parser.add_argument('--ewc_lambda', default=[0.4], nargs='+', type=float, help='hyperparameter of EWC')
 parser.add_argument('--scale_ewc_lambda', default=[1], nargs='+', type=int, help='scale ewc_lambda')
+parser.add_argument('--n_ewc_warmup', default=0, type=int, help='during warmup, tasks are trained with ewc_lambda=0')
 parser.add_argument('--full_seq', default='ITTIV', help='order of modalities')
 
 parser.add_argument('--restore_cl', default=-1, help='Step from which to restore model training')
@@ -169,7 +170,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 		  save_best=False, testing=False, sample_idx_fn=None, seq_lst=None, rewarding=False,
 		  random_seq=False, notest=False, test=False, test_on_val=False,
 		  use_sgd=False,
-		  task_id=0, ewc_lambda=0, full_seq='ITTIV',counting_reward_dict=None,pass_idx=None):
+		  task_id=0, ewc_lambda=0, n_warmup_steps=3000, 
+		  full_seq='ITTIV',counting_reward_dict=None,pass_idx=None):
 	log_dir = 'logs/%s' % task
 	if not os.path.exists(log_dir):
 		os.makedirs(log_dir)
@@ -241,7 +243,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 			Adam(
 				filter(lambda x: x.requires_grad, shared_model.parameters()),
 				betas=(0.9, 0.98), eps=1e-09),
-			512, args.n_warmup_steps,0,max_lr=0.0001,init_lr=args.init_lr)
+			512, n_warmup_steps,0,max_lr=0.0001,init_lr=args.init_lr)
 
 	if current_modality in current_iterations and (args.restore_opt or args.restore_opt_lr):
 		optimizer.set_current_step(current_iterations[current_modality])
@@ -558,7 +560,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 				if eval_step >= args.converge_window:
 					prev_max_val_score = max(prev_max_val_score, validation_score_history[int(eval_step-args.converge_window)])
 
-					if curr_max_val_score <= prev_max_val_score and eval_step >= args.safe_window:
+					if curr_max_val_score <= prev_max_val_score and eval_step >= safe_window:
 						break
 
 				model = model.train()
@@ -941,7 +943,7 @@ if __name__ == '__main__':
 					 args.sample_idx_fn, seq_lst, args.rewarding, 
 					 args.random_seq, notest, test, test_on_val,
 					 args.use_sgd,
-					 task_id, ewc_lambda[task_category_id]*ewc_scales[k], 
+					 task_id, ewc_lambda[task_category_id]*ewc_scales[k]*(k+1>args.n_ewc_warmup), 
 					 args.full_seq, None, None) #int(args.all_seed)+k) 
 					 # use args.all_seed+k to set a different seed for dataloader in a different pass
 					 # set to None for same seed
@@ -981,7 +983,8 @@ if __name__ == '__main__':
 							 args.sample_idx_fn, seq_lst_test, args.rewarding,
 							 args.random_seq, notest, test, test_on_val,
 							 args.use_sgd,
-							 task_category_id_test, ewc_lambda[task_category_id]*ewc_scales[k], 
+							 task_category_id_test, 
+							 ewc_lambda[task_category_id]*ewc_scales[k]*(k+1>args.n_ewc_warmup), 
 							 args.full_seq,
 							 counting_reward_dict, None)
 
