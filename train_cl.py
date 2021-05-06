@@ -943,7 +943,7 @@ if __name__ == '__main__':
 					 args.sample_idx_fn, seq_lst, args.rewarding, 
 					 args.random_seq, notest, test, test_on_val,
 					 args.use_sgd,
-					 task_id, ewc_lambda[task_category_id]*ewc_scales[k]*(k+1>args.n_ewc_warmup), 
+					 task_id, ewc_lambda[task_category_id]*ewc_scales[k]*(task_id+1>args.n_ewc_warmup), 
 					 n_warmup_steps[task_category_id],
 					 args.full_seq, None, None) #int(args.all_seed)+k) 
 					 # use args.all_seed+k to set a different seed for dataloader in a different pass
@@ -985,7 +985,7 @@ if __name__ == '__main__':
 							 args.random_seq, notest, test, test_on_val,
 							 args.use_sgd,
 							 task_category_id_test, 
-							 ewc_lambda[task_category_id]*ewc_scales[k]*(k+1>args.n_ewc_warmup), 
+							 ewc_lambda[task_category_id]*ewc_scales[k]*(task_id+1>args.n_ewc_warmup), 
 							 n_warmup_steps[task_category_id],
 							 args.full_seq,
 							 counting_reward_dict, None)
