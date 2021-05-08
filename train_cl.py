@@ -251,7 +251,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 
 
 	if ((args.restore_opt or args.restore_opt_lr) and current_modality in current_iterations) or (args.restore_opt_lr_all and 'last' in current_iterations):
-		if args.restore_opt_lr:
+		if args.restore_opt_lr or args.restore_opt:
 			optimizer.set_current_step(current_iterations[current_modality])
 			log_str += 'restore optimizer iteration: %s\n'%(current_iterations[current_modality])
 		
