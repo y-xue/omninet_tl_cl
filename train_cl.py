@@ -91,7 +91,11 @@ parser.add_argument('--restore_cl', default=-1, help='Step from which to restore
 parser.add_argument('--converge_window', default=10, type=int, help='Window size for convergence test')
 parser.add_argument('--safe_window', default=30, type=int, help='Never stop training in safe_window')
 parser.add_argument('--restore_opt', action='store_true', help='True if restore optimizer for each task.')
-parser.add_argument('--restore_opt_lr', action='store_true', help='True if restore learning rate for each task.')
+parser.add_argument('--restore_opt_lr', action='store_true', help='True if restore learning rate for each task by modality.')
+parser.add_argument('--restore_opt_lr_all', action='store_true', help='True if restore learning rate for each task.')
+parser.add_argument('--no_penalty_on_same_modality', action='store_true', help='True if use ewc_lambda = 0 on tasks ending with the same modality.')
+
+
 
 args = parser.parse_args()
 
@@ -170,7 +174,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 		  save_best=False, testing=False, sample_idx_fn=None, seq_lst=None, rewarding=False,
 		  random_seq=False, notest=False, test=False, test_on_val=False,
 		  use_sgd=False,
-		  task_id=0, ewc_lambda=0, n_warmup_steps=3000, 
+		  task_id=0, task_category_id=0, ewc_lambda=0, n_warmup_steps=3000, 
 		  full_seq='ITTIV',counting_reward_dict=None,pass_idx=None):
 	log_dir = 'logs/%s' % task
 	if not os.path.exists(log_dir):
@@ -245,16 +249,26 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 				betas=(0.9, 0.98), eps=1e-09),
 			512, n_warmup_steps,0,max_lr=0.0001,init_lr=args.init_lr)
 
-	if current_modality in current_iterations and (args.restore_opt or args.restore_opt_lr):
-		optimizer.set_current_step(current_iterations[current_modality])
-		log_str += 'restore optimizer iteration: %s\n'%(current_iterations[current_modality])
 
+	if ((args.restore_opt or args.restore_opt_lr) and current_modality in current_iterations) or (args.restore_opt_lr_all and 'last' in current_iterations):
+		if args.restore_opt_lr:
+			optimizer.set_current_step(current_iterations[current_modality])
+			log_str += 'restore optimizer iteration: %s\n'%(current_iterations[current_modality])
+		
+		if args.restore_opt_lr_all:
+			optimizer.set_current_step(current_iterations['last'])
+			log_str += 'restore optimizer iteration: %s\n'%(current_iterations['last'])
+		
 		if args.restore_opt:
 			optimizer.restore(args.model_save_path, '%s/0'%current_modality)
 			log_str += 'restore optimizer from %s/%s/0\n'%(args.model_save_path, current_modality)
 		
 	else:
-		current_iterations[current_modality] = 0
+		if current_modality not in current_iterations:
+			current_iterations[current_modality] = 0
+
+		if 'last' not in current_iterations:
+			current_iterations['last'] = 0
 
 	model=model.train()
 
@@ -597,7 +611,11 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 						prev_task_idx_lst = [ti % len(args.full_seq) for ti in range(task_id-len(args.full_seq)+1, task_id)]
 
 					for prev_task_idx in prev_task_idx_lst:
-						fisher_loss_dict[prev_task_idx] = {'loss': 0, 'ewc_lambda': ewc_lambda}
+						adjusted_ewc_lambda = ewc_lambda
+						if args.no_penalty_on_same_modality and current_modality == args.full_seq[prev_task_idx]:
+							adjusted_ewc_lambda = 0
+
+						fisher_loss_dict[prev_task_idx] = {'loss': 0, 'ewc_lambda': adjusted_ewc_lambda}
 						for name, param in model.named_parameters():
 							if name not in fisher_dict[prev_task_idx]:
 								continue
@@ -605,7 +623,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 							optpar = optpar_dict[prev_task_idx][name]
 							
 							fisher_loss = (fisher * (optpar - param).pow(2)).sum()
-							loss += fisher_loss * ewc_lambda
+							loss += fisher_loss * adjusted_ewc_lambda
 
 							fisher_loss_dict[prev_task_idx]['loss'] += fisher_loss.detach()
 
@@ -664,6 +682,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 		sys.stdout.flush()
 
 	current_iterations[current_modality] += best_iteration
+	current_iterations['last'] += best_iteration
 
 	if model_save_path is not None:
 		with open(model_save_path + '.log', 'a') as f: #open(os.path.join(model_save_path, 'log.txt'), 'a') as f:
@@ -943,7 +962,8 @@ if __name__ == '__main__':
 					 args.sample_idx_fn, seq_lst, args.rewarding, 
 					 args.random_seq, notest, test, test_on_val,
 					 args.use_sgd,
-					 task_id, ewc_lambda[task_category_id]*ewc_scales[k]*(task_id+1>args.n_ewc_warmup), 
+					 task_id, task_category_id,
+					 ewc_lambda[task_category_id]*ewc_scales[k]*(task_id+1>args.n_ewc_warmup), 
 					 n_warmup_steps[task_category_id],
 					 args.full_seq, None, None) #int(args.all_seed)+k) 
 					 # use args.all_seed+k to set a different seed for dataloader in a different pass
@@ -985,6 +1005,7 @@ if __name__ == '__main__':
 							 args.random_seq, notest, test, test_on_val,
 							 args.use_sgd,
 							 task_category_id_test, 
+							 task_category_id,
 							 ewc_lambda[task_category_id]*ewc_scales[k]*(task_id+1>args.n_ewc_warmup), 
 							 n_warmup_steps[task_category_id],
 							 args.full_seq,

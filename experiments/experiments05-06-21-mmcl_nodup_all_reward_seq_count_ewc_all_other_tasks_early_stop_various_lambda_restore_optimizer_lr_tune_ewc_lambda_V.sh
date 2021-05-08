@@ -42,20 +42,47 @@ run() {
 
 
 run1() {
-	run 1 0 0 0 0 50 0.02 2;
+	# lr=0.005
+	for l5 in 150 200 250 300
+	do
+		run 0 0 0 0 0 ${l5} 0.005 2;
+		sleep 5;
+	done
 }
 
 run2() {
+	# lr=0.01
 	sleep 5
-	run 2 0 0 0 0 200 0.02 2;
+	for l5 in 150 200 250 300
+	do
+		run 1 0 0 0 0 ${l5} 0.01 2;
+		sleep 5;
+	done
 }
 
 run3() {
+	# lr=0.008
 	sleep 10
-	run 3 0 0 0 0 500 0.02 2;
+	for l5 in 150 200 250 300
+	do
+		run 2 0 0 0 0 ${l5} 0.008 2;
+		sleep 5;
+	done
+}
+
+run4() {
+	# lr=0.003
+	sleep 15
+	for l5 in 150 200 250 300
+	do
+		run 3 0 0 0 0 ${l5} 0.003 2;
+		sleep 5;
+	done
 }
 
 
 run1 &
 run2 &
-run3
+run3 &
+run4
+
