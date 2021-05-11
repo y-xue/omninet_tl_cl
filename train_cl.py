@@ -205,7 +205,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 
 	log_str = ''
 	current_modality = args.full_seq[task_id % len(args.full_seq)]
-	if current_modality == 'V':
+	if current_modality == 'V' and task_id >= 5:
 		safe_window = 10
 	else:
 		safe_window = args.safe_window
