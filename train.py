@@ -112,6 +112,7 @@ parser.add_argument('--no_logit_struct_peripheral', action='store_true', help='T
 parser.add_argument('--unstructured_as_structured', action='store_true', help='Indicates if using unstructured encodings as structured data.')
 parser.add_argument('--unfreeze', default=[], nargs='+', type=str, help='indicates which peripheral to unfreeze')
 parser.add_argument('--logit_struct_periph_dim', default=512, type=int, help='logit_struct_periph_dim')
+parser.add_argument('--n_warmup_steps', default=16000, type=int, help='n_warmup_steps for ScheduledOptim')
 
 args = parser.parse_args()
 
@@ -295,7 +296,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
             Adam(
                 filter(lambda x: x.requires_grad, shared_model.parameters()),
                 betas=(0.9, 0.98), eps=1e-09),
-            512, 16000,restore,init_lr=0.02)
+            512, args.n_warmup_steps,restore,init_lr=args.init_lr)
     elif task == 'vqa' or task == 'vqa_struct':
         if task == 'vqa':
             tr_dl,val_dl,test_dl = dl.vqa_batchgen(vqa_dir, coco_images, num_workers=n_workers, batch_size=batch_size, with_val=with_val, use_boxes=args.use_boxes, make_tr_dl_iter=False, unstructured_as_structured=args.unstructured_as_structured, data_seed=args.data_seed)
@@ -318,13 +319,13 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                 SGD(
                     filter(lambda x: x.requires_grad, shared_model.parameters()),
                     lr=0.0001, momentum=0.9),
-                512, 16000,restore,max_lr=0.0001,init_lr=args.init_lr)
+                512, args.n_warmup_steps,restore,max_lr=0.0001,init_lr=args.init_lr)
         else:
             optimizer = ScheduledOptim(
                 Adam(
                     filter(lambda x: x.requires_grad, shared_model.parameters()),
                     betas=(0.9, 0.98), eps=1e-09),
-                512, 16000,restore,max_lr=0.0001,init_lr=args.init_lr)
+                512, args.n_warmup_steps,restore,max_lr=0.0001,init_lr=args.init_lr)
 
     # elif task == 'vqa_struct':
     #     DL,val_dl = dl.vqa_struct_batchgen(vqa_dir, coco_images, num_workers=0, batch_size=batch_size)
@@ -332,14 +333,14 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
     #         Adam(
     #             filter(lambda x: x.requires_grad, shared_model.parameters()),
     #             betas=(0.9, 0.98), eps=1e-09),
-    #         512, 16000,restore,max_lr=0.0001,init_lr=0.02)
+    #         512, 16000,restore,max_lr=0.0001,init_lr=args.init_lr)
     elif task == 'birds' or task == 'birds_struct':
         DL,val_dl,test_dl = dl.birds_batchgen(birds_dir, num_workers=n_workers, batch_size=batch_size, testing=testing)
         optimizer = ScheduledOptim(
             Adam(
                 filter(lambda x: x.requires_grad, shared_model.parameters()),
                 betas=(0.9, 0.98), eps=1e-09),
-            512, 16000,restore,max_lr=0.0001,init_lr=0.02)
+            512, args.n_warmup_steps,restore,max_lr=0.0001,init_lr=args.init_lr)
     elif task == 'mm_ITV' or task == 'mm_seq10':
         with open(os.path.join(mm_dir, sample_idx_fn), 'rb') as f:
             sample_idx = pickle.load(f)
@@ -439,7 +440,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
             Adam(
                 filter(lambda x: x.requires_grad, shared_model.parameters()),
                 betas=(0.9, 0.98), eps=1e-09),
-            512, 16000,restore,max_lr=0.0001,init_lr=0.02)
+            512, args.n_warmup_steps,restore,max_lr=0.0001,init_lr=args.init_lr)
     elif task == 'mm_IT':
         seq_lst = ['0-1', '1-0', '1-1', '2-1', '1-2', '2-0', '2-2', '0-2']
         full_seq = 'ITIT'
@@ -455,7 +456,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
             Adam(
                 filter(lambda x: x.requires_grad, shared_model.parameters()),
                 betas=(0.9, 0.98), eps=1e-09),
-            512, 16000,restore,max_lr=0.0001,init_lr=0.02)
+            512, args.n_warmup_steps,restore,max_lr=0.0001,init_lr=args.init_lr)
     elif task == 'mm_vqa':
         DL0,DL1,DL2,DL3,val_dl = dl.mm_vqa_batchgen(vqa_dir, coco_images, num_workers=n_workers, batch_size=batch_size)
         DLS = iter(cycle([DL0,DL1,DL2,DL3]))
@@ -466,7 +467,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
             Adam(
                 filter(lambda x: x.requires_grad, shared_model.parameters()),
                 betas=(0.9, 0.98), eps=1e-09),
-            512, 16000,restore,max_lr=0.0001,init_lr=0.02)
+            512, args.n_warmup_steps,restore,max_lr=0.0001,init_lr=args.init_lr)
     
     elif task == 'hmdb':
         DL,val_dl=dl.hmdb_batchgen(hmdb_data_dir,hmdb_process_dir,num_workers=n_workers,batch_size=batch_size,
@@ -476,7 +477,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
             Adam(
                 filter(lambda x: x.requires_grad, shared_model.parameters()),
                 betas=(0.9, 0.98), eps=1e-09),
-            512, 16000,restore,max_lr=0.0001,init_lr=0.02)
+            512, args.n_warmup_steps,restore,max_lr=0.0001,init_lr=args.init_lr)
     elif task == 'penn':
         DL,val_dl,test_dl=dl.penn_dataloader(penn_data_dir,batch_size=batch_size,
                                              test_batch_size=int(batch_size/2),num_workers=n_workers,vocab_file='conf/penn_vocab.json')
@@ -484,7 +485,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
             Adam(
                 filter(lambda x: x.requires_grad, shared_model.parameters()),
                 betas=(0.9, 0.98), eps=1e-09),
-            512, 16000,restore,init_lr=0.02)
+            512, args.n_warmup_steps,restore,init_lr=args.init_lr)
         
     if restore != 0:
         if save_best:

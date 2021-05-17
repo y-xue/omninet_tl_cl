@@ -25,6 +25,8 @@ parser.add_argument('--xi', default=0.01, type=float, help='exploitation-explora
 parser.add_argument('--restore', default=-1, type=int, help='Step from which to restore model training')
 parser.add_argument('--sample_weights', default=None, type=str, help='sample weights separated by comma')
 parser.add_argument('--data_seed', default=615, type=int, help='data seed')
+parser.add_argument('--init_lr', default=0.02, type=float, help='init_lr')
+parser.add_argument('--n_warmup_steps', default=16000, type=int, help='n_warmup_steps for ScheduledOptim')
 
 args = parser.parse_args()
 
@@ -46,8 +48,10 @@ class Trainer(object):
 		self.seq='ITTIV'
 		self.task='mm_ITV'
 		self.n_gpus=1
+		self.init_lr=args.init_lr
 		self.all_seed=args.seed #(1029 47 816 21 219 222 628 845 17 531 635)
 		self.data_seed=args.data_seed
+		self.n_warmup_steps=args.n_warmup_steps
 		self.overfitting_threshold = 0.0001
 		self.start_detect_overfitting_iter = 1000
 
@@ -186,6 +190,10 @@ class Trainer(object):
 			model_save_path,
 			'--move_out_path',
 			move_out_path,
+			'--init_lr',
+			'%s'%self.init_lr,
+			'--n_warmup_steps',
+			'%s'%self.n_warmup_steps,
 			'--sample_idx_fn', 
 			'sample_idx_ITTIV_pT.7_no_dup_all_img_text_video_seed10', 
 			'--sample_weights_fn',
@@ -307,6 +315,10 @@ class Trainer(object):
 			move_out_path,
 			'--move_out_path',
 			move_out_path,
+			'--init_lr',
+			'%s'%self.init_lr,
+			'--n_warmup_steps',
+			'%s'%self.n_warmup_steps,
 			'--sample_idx_fn', 
 			'sample_idx_ITTIV_pT.7_no_dup_all_img_text_video_seed10', 
 			'--sample_weights_fn',
