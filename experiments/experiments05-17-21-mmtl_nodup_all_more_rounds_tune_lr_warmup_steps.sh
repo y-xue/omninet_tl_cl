@@ -13,12 +13,14 @@ run1(){
 	n_warmup=$7
 	slp=$8
 
+	out_path=mm_random_seq_dropout_0.5_0.25_lr${lr}_warmup${n_warmup}_allseed${seed}_dataseed${data_seed}_iter${n_iter}_sw1
+
 	sleep ${slp};
 	python train_with_bayesian_opt.py --gpu_id $gpu_id \
-	--out_path ITTIV_all/mm_random_seq_dropout_0.5_0.25_lr${lr}_warmup${n_warmup}_allseed${seed}_dataseed${data_seed}_iter${n_iter}_sw1 \
+	--out_path ITTIV_all/${out_path} \
 	--seed $seed --data_seed $data_seed \
 	--init_lr ${lr} --n_warmup_steps ${n_warmup} \
-	--bo_n_iter 0 --n_iter ${n_iter} --sample_weights $sw < /dev/null > /dev/null 2>&1;
+	--bo_n_iter 0 --n_iter ${n_iter} --sample_weights $sw > /${out_path}.log 2> /${out_path}.err;
 
 }
 
