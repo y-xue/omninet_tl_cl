@@ -263,12 +263,11 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 			optimizer.restore(args.model_save_path, '%s/0'%current_modality)
 			log_str += 'restore optimizer from %s/%s/0\n'%(args.model_save_path, current_modality)
 		
-	else:
-		if current_modality not in current_iterations:
-			current_iterations[current_modality] = 0
+	if current_modality not in current_iterations:
+		current_iterations[current_modality] = 0
 
-		if 'last' not in current_iterations:
-			current_iterations['last'] = 0
+	if 'last' not in current_iterations:
+		current_iterations['last'] = 0
 
 	model=model.train()
 
