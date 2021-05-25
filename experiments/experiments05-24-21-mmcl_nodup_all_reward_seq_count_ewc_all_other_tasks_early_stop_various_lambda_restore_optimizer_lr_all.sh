@@ -48,7 +48,7 @@ run() {
 }
 
 run1() {
-	for lr in 0.008 0.01 0.02
+	for lr in 0.008 0.01 
 	do
 		run 0 20 0 0 50 100 ${lr} 2 2000 2000 2000 2000 200;
 		sleep 5;
@@ -57,14 +57,24 @@ run1() {
 
 run2() {
 	sleep 5
-	for lr in 0.003 0.005 0.002
+	for lr in 0.003 0.005
 	do
 		run 1 20 0 0 50 100 ${lr} 2 2000 2000 2000 2000 200;
 		sleep 5;
 	done
 }
 
+run3() {
+	sleep 10
+	for lr in 0.02 0.002
+	do
+		run 3 20 0 0 50 100 ${lr} 2 2000 2000 2000 2000 200;
+		sleep 5;
+	done
+}
+
 
 run1 &
-run2 
+run2 &
+run3
 
