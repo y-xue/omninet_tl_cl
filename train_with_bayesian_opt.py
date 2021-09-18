@@ -27,6 +27,7 @@ parser.add_argument('--sample_weights', default=None, type=str, help='sample wei
 parser.add_argument('--data_seed', default=615, type=int, help='data seed')
 parser.add_argument('--init_lr', default=0.02, type=float, help='init_lr')
 parser.add_argument('--n_warmup_steps', default=16000, type=int, help='n_warmup_steps for ScheduledOptim')
+parser.add_argument('--skip_read_best', action='store_true', help='true if avoid reading best reward if log file already exists')
 
 args = parser.parse_args()
 
@@ -154,7 +155,7 @@ class Trainer(object):
 		model_save_path = os.path.join('out', self.bo_iter_output_path+'_boiter%s')%(self.seq, self.bs, self.n_iter, self.all_seed, self.bo_iter)
 		move_out_path = os.path.join(self.move_out, self.bo_iter_output_path+'_boiter%s')%(self.seq, self.bs, self.n_iter, self.all_seed, self.bo_iter)
 
-		if os.path.exists('%s.log'%move_out_path):
+		if not args.skip_read_best and os.path.exists('%s.log'%move_out_path):
 			# print('reading res from ', '%s.log'%move_out_path)
 			# print('log exists')
 			return self.read_best_val_scores(move_out_path)
@@ -181,8 +182,7 @@ class Trainer(object):
 			'%s'%self.n_gpus,
 			'--save_interval',
 			'%s'%self.save_intvl,
-			'--restore',
-			'%s'%args.restore,
+			'--restore_last',
 			'--eval_interval',
 			'%s'%self.eval_intvl,
 			'--save_best',
