@@ -82,3 +82,5 @@ run1 &
 run2 &
 run3
 
+# NEXT: tune from the best setting on seed 816
+

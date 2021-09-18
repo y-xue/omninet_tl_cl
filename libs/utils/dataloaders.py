@@ -1181,7 +1181,7 @@ class mm_dataset(Dataset):
         pick_sample_by_intsance_id=False, stop_overfitted_ins=False, 
         shuffle=True, split='train', seq_count=True):
         # sample_idx:
-        #  {seq_type: [instance_id, t, c, I, T, T, I, ...]}
+        #  {seq_idx: [instance_id, t, c, I, T, T, I, ...]}
 
         # print('mm_dataset %s'%seq)
 
@@ -1536,6 +1536,78 @@ def mm_collate_fn(data):
         'videos': torch.stack(collate_videos, dim=0) if len(collate_videos) != 0 else None,
         'labels': collate_labels,
         'sample_weights': collate_w
+    }
+
+class bdd_dataset(Dataset):
+    def __init__(self, data_dir, full_seq, seq_idx, sample_idx, max_len=8, fps=3):
+        self.data_dir = data_dir
+        self.full_seq = full_seq
+        self.seq_idx = seq_idx
+        self.sample_idx = sample_idx
+        self.max_len = max_len
+        self.fps = fps
+
+        seq = self.full_seq[:seq_idx]
+        self.n_videos = seq.count('V')
+        self.n_gps = seq.count('G')
+
+    def __len__(self):
+        return self.len(self.sample_idx)
+
+    def __getitem__(self, idx):
+        video_name = self.sample_idx[idx]
+        # use end_time instead of start_time
+        video = read_video(self.data_dir, video_name)
+        gps = read_gps(self.data_dir, video_name)
+        labels = read_labels(self.data_dir, video_name)
+
+        video = video[-(self.max_len*self.fps-1):-1] # the last frame is for label
+        # consider truncating videos and save them to file to speed up loading
+        
+        video_lst = [video[i*self.fps:(i+1)*self.fps] for i in range(self.n_videos)]
+        gps_lst = [gps[i*self.fps:(i+1)*self.fps] for i in range(self.n_gps)]
+
+        # end_frame_idx = n_videos * self.fps + 1
+        # end_gps_idx = n_gps * self.fps + 1
+
+        # video = video[:end_frame_idx]
+        # gps = gps[:end_gps_idx]
+        label = labels[-1]
+
+        return {'video': video_lst, 'gps': gps_lst, 'label': label}
+
+def bdd_batchgen(data_dir):
+    sample_idx = read()...
+    # tr_names, val_names = read_names(os.path.join(data_dir, 'sp'))
+    transforms = ...
+
+    for seq in sample_idx['train']:
+        bdd_dataset_tr = bdd_dataset(data_dir, seq, sample_idx['train'][seq])
+
+    transforms_val = ...
+    for seq in sample_idx['val']:
+        bdd_dataset_val = bdd_dataset(data_dir, seq, sample_idx['val'][seq])
+    
+    return 
+
+def bdd_collate_fn(data):
+    collate_videos = []
+    collate_gps = []
+    collate_labels = []
+
+    for d in data:
+        if len(d['video']) != 0:
+            collate_videos.append(d['video']) 
+        if len(d['gps']) != 0:
+            collate_gps.append(d['gps'])
+        collate_labels.append(d['label'])
+    
+    collate_labels = torch.tensor(collate_labels).reshape([-1,1])
+
+    return {
+        'videos': collate_videos if len(collate_videos) != 0 else None,
+        'gps': collate_gps if len(collate_gps) != 0 else None,
+        'labels': collate_labels
     }
 
 class mm_vqa_dataset(Dataset):

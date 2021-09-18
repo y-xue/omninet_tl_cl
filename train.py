@@ -487,22 +487,30 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                 betas=(0.9, 0.98), eps=1e-09),
             512, args.n_warmup_steps,restore,init_lr=args.init_lr)
         
-    if restore != 0:
-        if save_best:
+    # if restore != 0:
+    #     if save_best:
+    #         optimizer.restore(move_out_path, 'last/0')
+    #     else:
+    #         optimizer.restore(move_out_path, restore)
+
+    if save_best:
+        if os.path.exists(os.path.join(move_out_path, 'last/0/optimizer.pth')) and os.stat(args.move_out_path + '/last/0/model.pth').st_size == os.stat(args.move_out_path + '/best/0/model.pth').st_size:
             optimizer.restore(move_out_path, 'last/0')
-        else:
-            optimizer.restore(move_out_path, restore)
+        elif os.path.exists(os.path.join(move_out_path, 'best/0/optimizer.pth')):
+            optimizer.restore(move_out_path, 'best/0')
+    elif os.path.exists(os.path.join(move_out_path, '%s/optimizer.pth'%restore)):
+        optimizer.restore(move_out_path, restore)
 
     model=model.train()
-
-    best_val_reward = 0
 
     if os.path.exists(move_out_path + '/best/acc.pkl'):
         with open(move_out_path + '/best/acc.pkl', 'rb') as f:
             acc = pickle.load(f)
         best_val_acc = acc['best_val_acc']
+        best_val_reward = acc['best_val_reward'] if 'best_val_reward' in acc else 0
     else:
         best_val_acc = 0
+        best_val_reward = 0
     
     if test:
         best_iteration = restore
@@ -758,6 +766,14 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                         optimizer.save(move_out_path, 'best/0')
                     # best_model = shared_model.state_dict()
                     # shared_model.save(model_save_path, step, best_model=True)
+
+                with open(move_out_path + '/best/acc.pkl', 'wb') as f:
+                        pickle.dump({
+                            'best_val_acc': best_val_acc, 
+                            'best_iteration': best_iteration,
+                            'best_val_reward': best_val_reward
+                            }, f)
+
                 print('Step %d, mm total validation Accuracy %f %%, reward: %f'%(step, total_val_acc, total_reward))
                 log_str += 'Step %d, mm total validation Accuracy %f %%, reward: %f\n'%(step, total_val_acc, total_reward)
 
@@ -1557,9 +1573,11 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                 shared_model.save(model_save_path, step)
                 optimizer.save(model_save_path, step)
 
-            if save_best and ((i+1)//save_interval + 1) * save_interval >= train_steps:
+            if save_best: # and ((i+1)//save_interval + 1) * save_interval >= train_steps:
                 shared_model.save(move_out_path, 'last/0')
                 optimizer.save(move_out_path, 'last/0')
+                with open(move_out_path + '/last/iter.pkl', 'wb') as f:
+                    pickle.dump({'iteration': step}, f)
 
             if task == 'vqa_struct' and (args.inject_at_encoder or args.inject_after_encoder) and args.spat_fusion_attn_type != 'none': 
                 with open(model_save_path+'_spat_struct_enc_gate_tr_%s.dict'%i, 'wb') as f:
@@ -1605,7 +1623,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                 move_out_path + '_' + str(best_iteration))
 
             ckpts = glob.glob(os.path.join(model_save_path, '*'))
-            iters = [int(os.path.basename(c)) for c in ckpts]
+            iters = [int(os.path.basename(c)) for c in ckpts if os.path.basename(c) not in ['best', 'last']]
             if len(iters) != 0:
                 last = max(iters)
 
@@ -1657,9 +1675,18 @@ if __name__ == '__main__':
 
     if args.restore_last == True:
         ckpts = glob.glob(os.path.join(args.model_save_path, '*'))
-        iters = [int(os.path.basename(c)) for c in ckpts if os.path.basename(c) != 'best']
+        iters = [int(os.path.basename(c)) for c in ckpts if os.path.basename(c) not in ['best','last']]
         if len(iters) != 0:
             restore = max(iters)
+        elif os.path.exists(args.move_out_path + '/last/iter.pkl'):
+            if os.stat(args.move_out_path + '/last/0/model.pth').st_size == os.stat(args.move_out_path + '/best/0/model.pth').st_size:
+                with open(args.move_out_path + '/last/iter.pkl', 'rb') as f:
+                    restore_iter = pickle.load(f)
+                restore = restore_iter['iteration']
+            else:
+                with open(args.move_out_path + '/best/acc.pkl', 'rb') as f:
+                    restore_iter = pickle.load(f)
+                restore = restore_iter['best_iteration']
         else:
             restore = -1
     else:
@@ -1716,7 +1743,10 @@ if __name__ == '__main__':
     eval_first = False
     if restore != -1:
         if args.save_best:
-            shared_model.restore(args.move_out_path, 'last/0')
+            if os.stat(args.move_out_path + '/last/0/model.pth').st_size == os.stat(args.move_out_path + '/best/0/model.pth').st_size:
+                shared_model.restore(args.move_out_path, 'last/0')
+            else:
+                shared_model.restore(args.move_out_path, 'best/0')
         else:
             shared_model.restore(args.move_out_path, restore)
         with open(args.move_out_path + '.log', 'r') as f:
