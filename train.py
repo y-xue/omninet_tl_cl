@@ -512,6 +512,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
         best_val_acc = 0
         best_val_reward = 0
     
+    print_log('best_val_reward: %s'%best_val_reward, move_out_path + '.log')
+
     if test:
         best_iteration = restore
         train_steps = start + 2
