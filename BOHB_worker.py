@@ -12,18 +12,20 @@ import random
 
 class MyWorker(Worker):
 
-    def __init__(self, *args, seed=1029, out_path='mm_random_seq_dropout_0.5_0.25_allseed219', gpu_id=0, xi=0.01, **kwargs):
+    def __init__(self, *args, seed=1029, out_path='mm_random_seq_dropout_0.5_0.25_allseed219', gpu_id=0, xi=0.01, lr=0.01, n_warmup_steps=5000, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.xi = xi
         self.save_intvl=500
         self.eval_intvl=500
+        self.lr=lr
         self.bs=16
         # self.n_iter=4005
         self.seq='ITTIV'
         self.task='mm_ITV'
         self.n_gpus=1
         self.all_seed=seed #(1029 47 816 21 219 222 628 845 17 531 635)
+        self.n_warmup_steps=n_warmup_steps
         self.overfitting_threshold = 0.0001
         self.start_detect_overfitting_iter = 1000
 
@@ -115,6 +117,10 @@ class MyWorker(Worker):
             '%s'%self.save_intvl,
             '--eval_interval',
             '%s'%self.eval_intvl,
+            '--init_lr',
+            '%s'%self.lr,
+            '--n_warmup_steps',
+            '%s'%self.n_warmup_steps,
             '--save_best',
             '--model_save_path',
             model_save_path,
