@@ -24,6 +24,7 @@ parser.add_argument('--n_warmup_steps', type=int, help='n_warmup_steps', default
 parser.add_argument('--out_path', default='mm_nodup_data_random_seq_detect_overfitting_with_tr_acc_stop_overfitted_seq_0.0001ot_1000os_dropout_0.5_0.25', help='output path')
 parser.add_argument('--gpu_id', default='0', type=str, help='which gpu to use.')
 parser.add_argument('--port', default=9090, type=int, help='port')
+parser.add_argument('--n_random_init', default=None, type=int, help='min_points_in_model')
 
 args=parser.parse_args()
 
@@ -58,7 +59,7 @@ print('worker running')
 # Now we can create an optimizer object and start the run.
 # Here, we run BOHB, but that is not essential.
 # The run method will return the `Result` that contains all runs performed.
-bohb = BOHB(  configspace = w.get_configspace(args.seed),
+bohb = BOHB(  configspace = w.get_configspace(args.seed), min_points_in_model=args.n_random_init,
               run_id = str(args.seed), nameserver='127.0.0.1',nameserver_port=args.port,
               min_budget=args.min_budget, max_budget=args.max_budget
            )
