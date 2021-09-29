@@ -35,7 +35,7 @@ class MyWorker(Worker):
         # self.data_path='/Users/ye/Documents/research/allstate/data/synthetic_mm_cifar_imdb_hmdb'
         self.move_out='/files/yxue/research/allstate/out'
         self.data_path='/files/yxue/research/allstate/data/synthetic_mm_cifar_imdb_hmdb'
-        self.bo_iter_output_path='mm_bo/'+ self.out_path + '/%s_%sbs_%sit_allseed%s'
+        self.bo_iter_output_path='mm_bo/'+ self.out_path + '/%s_%sbs'
         
         self.bo_iter = 0
         self.best_bo_iter = 0
@@ -56,21 +56,34 @@ class MyWorker(Worker):
             log = f.read()
         
         val_res = re.findall(r'Step (\d+), mm total validation Accuracy (\d+\.\d+) \%, reward: (\d+\.\d+)', log)
+        if len(val_res) == 0:
+            return None
         val_acc = np.array([float(x[1]) for x in val_res])
         val_reward = np.array([float(x[2]) for x in val_res])
         val_step = np.array([float(x[0]) for x in val_res])
 
         if score == 'reward':
-            return max(val_reward)
-        return max(val_acc)
+            return max(val_reward[val_step<self.n_iter])
+        return max(val_acc[val_step<self.n_iter])
 
     def read_test_scores(self, move_out_path, score='reward'):
         with open('%s.log'%move_out_path, 'r') as f:
             log = f.read()
 
-        test_acc_res = re.findall(r'.*mm total test Accuracy (\d+\.\d+) \%, reward: (\d+\.\d+)', log)[0]
-        test_acc = float(test_acc_res[0])
-        test_reward = float(test_acc_res[1])
+        test_acc_res = re.findall(r'.Step (\d+),*total test Accuracy (\d+\.\d+) \%, reward: (\d+\.\d+)', log)#[0]
+        if len(test_acc_res) == 0:
+            return None
+        steps = [float(test_acc_res[i][0]) for i in range(len(test_acc_res))]
+        test_acc_rewards = [(float(test_acc_res[i][1]), float(test_acc_res[i][2])) for i in range(len(test_acc_res))]
+        res = dict(zip(steps, test_acc_rewards))
+        # test_acc = float(test_acc_res[0])
+        # test_reward = float(test_acc_res[1])
+
+        test_reward = test_acc = None
+        for step in res:
+            if step + 1 == self.n_iter:
+                test_acc, test_reward = res[step]
+                break
 
         if score == 'reward':
             return test_reward
@@ -85,13 +98,15 @@ class MyWorker(Worker):
     def total_val_reward(self, sample_weights, restore_last=False):
         # print(sample_weights)
 
-        model_save_path = os.path.join('out', self.bo_iter_output_path+'_boiter%s')%(self.seq, self.bs, self.n_iter, self.all_seed, self.bo_iter)
-        move_out_path = os.path.join(self.move_out, self.bo_iter_output_path+'_boiter%s')%(self.seq, self.bs, self.n_iter, self.all_seed, self.bo_iter)
+        # model_save_path = os.path.join('out', self.bo_iter_output_path+'_boiter%s')%(self.seq, self.bs, self.n_iter, self.all_seed, self.bo_iter)
+        move_out_path = os.path.join(self.move_out, self.bo_iter_output_path+'_boiter%s')%(self.seq, self.bs, self.bo_iter)
 
         if os.path.exists('%s.log'%move_out_path):
             # print('reading res from ', '%s.log'%move_out_path)
             # print('log exists')
-            return self.read_best_val_scores(move_out_path), self.read_test_scores(move_out_path)
+            best_val_reward, test_reward = self.read_best_val_scores(move_out_path), self.read_test_scores(move_out_path)
+            if test_reward is not None:
+                return best_val_reward, test_reward
 
         # print(sample_weights)
 
@@ -123,7 +138,7 @@ class MyWorker(Worker):
             '%s'%self.n_warmup_steps,
             '--save_best',
             '--model_save_path',
-            model_save_path,
+            move_out_path,
             '--move_out_path',
             move_out_path,
             '--sample_idx_fn', 
