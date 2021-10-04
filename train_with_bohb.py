@@ -19,7 +19,7 @@ parser.add_argument('--min_budget',   type=float, help='Minimum budget used duri
 parser.add_argument('--max_budget',   type=float, help='Maximum budget used during the optimization.',    default=243)
 parser.add_argument('--n_iterations', type=int,   help='Number of iterations performed by the optimizer', default=4)
 parser.add_argument('--seed', type=int, help='seed', default=1029)
-parser.add_argument('--lr', type=int, help='lr', default=0.01)
+parser.add_argument('--lr', type=float, help='lr', default=0.01)
 parser.add_argument('--n_warmup_steps', type=int, help='n_warmup_steps', default=5000)
 parser.add_argument('--out_path', default='mm_nodup_data_random_seq_detect_overfitting_with_tr_acc_stop_overfitted_seq_0.0001ot_1000os_dropout_0.5_0.25', help='output path')
 parser.add_argument('--gpu_id', default='0', type=str, help='which gpu to use.')
