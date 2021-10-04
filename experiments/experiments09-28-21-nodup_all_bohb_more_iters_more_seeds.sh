@@ -9,9 +9,9 @@ run_bo(){
 	python train_with_bohb.py --port=$port --gpu_id $gpu_id \
 	--out_path ${opath} \
 	--seed ${seed} --n_iterations 20 \
-	--min_budget 15000 --max_budget 50000 --n_random_init 3 < /dev/null > ${odir}/${opath}.nohup.log 2> /${odir}/${opath}.err;
+	--min_budget 15000 --max_budget 50000 --n_random_init 3 < /dev/null > ${odir}/${opath}.nohup.log 2> ${odir}/${opath}.err;
 
 }
 
-run_bo 21 1 9400 1 &
-run_bo 219 2 9500 60;
+run_bo 21 1 9400 1 #&
+# run_bo 219 2 9500 60;

@@ -558,21 +558,25 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
         step = counter.increment()
 
         if task == 'mm_ITV' or task == 'mm_seq10':
-            if not notest and i + 1 >= train_steps:
+            if not notest and evaluating(log, eval_interval, i):
+                if i == (start+1) and not eval_first:
+                    continue
                 # pretrained_dict=torch.load(os.path.join(model_save_path, 'best_val_model.pth'))
                 # model_dict=shared_model.state_dict()
                 # pretrained_dict = {k: v for k, v in pretrained_dict.items() if
                 #                (k in model_dict) and (model_dict[k].shape == pretrained_dict[k].shape)}
                 # model.load_state_dict(pretrained_dict,strict=False)
                 # print(best_iteration)
-                if save_best:
-                    shared_model.restore(move_out_path, 'best/0')
-                    optimizer.restore(move_out_path, 'best/0')
-                else:
-                    shared_model.restore(move_out_path, best_iteration)
-                    optimizer.restore(move_out_path, best_iteration)
 
-                log_str += 'Restored existing model with iterations: %d\n' % (best_iteration)
+                if i + 1 >= train_steps:
+                    if save_best:
+                        shared_model.restore(move_out_path, 'best/0')
+                        optimizer.restore(move_out_path, 'best/0')
+                    else:
+                        shared_model.restore(move_out_path, best_iteration)
+                        optimizer.restore(move_out_path, best_iteration)
+                        log_str += 'Restored existing model with iterations: %d\n' % (best_iteration)
+                        
                 model = shared_model
                 model = model.eval()
                 print('-' * 100)

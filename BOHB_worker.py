@@ -12,7 +12,7 @@ import random
 
 class MyWorker(Worker):
 
-    def __init__(self, *args, seed=1029, out_path='mm_random_seq_dropout_0.5_0.25_allseed219', gpu_id=0, xi=0.01, lr=0.01, n_warmup_steps=5000, **kwargs):
+    def __init__(self, *args, seed=1029, out_path='mm_random_seq_dropout_0.5_0.25_allseed219', gpu_id=0, xi=0.01, lr=0.01, n_warmup_steps=5000, restore_last=True, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.xi = xi
@@ -26,6 +26,7 @@ class MyWorker(Worker):
         self.n_gpus=1
         self.all_seed=seed #(1029 47 816 21 219 222 628 845 17 531 635)
         self.n_warmup_steps=n_warmup_steps
+        self.restore_last = restore_last
         self.overfitting_threshold = 0.0001
         self.start_detect_overfitting_iter = 1000
 
@@ -55,7 +56,7 @@ class MyWorker(Worker):
         with open('%s.log'%move_out_path, 'r') as f:
             log = f.read()
         
-        val_res = re.findall(r'Step (\d+), mm total validation Accuracy (\d+\.\d+) \%, reward: (\d+\.\d+)', log)
+        val_res = re.findall(r'Step (\d+),.*total validation Accuracy (\d+\.\d+) \%, reward: (\d+\.\d+)', log)
         if len(val_res) == 0:
             return None
         val_acc = np.array([float(x[1]) for x in val_res])
@@ -70,7 +71,7 @@ class MyWorker(Worker):
         with open('%s.log'%move_out_path, 'r') as f:
             log = f.read()
 
-        test_acc_res = re.findall(r'.Step (\d+),*total test Accuracy (\d+\.\d+) \%, reward: (\d+\.\d+)', log)#[0]
+        test_acc_res = re.findall(r'Step (\d+),.*total test Accuracy (\d+\.\d+) \%, reward: (\d+\.\d+)', log)#[0]
         if len(test_acc_res) == 0:
             return None
         steps = [float(test_acc_res[i][0]) for i in range(len(test_acc_res))]
@@ -95,7 +96,7 @@ class MyWorker(Worker):
             # print(dict(zip(range(1,len(self.seq)+1), sample_weights)))
             json.dump(dict(zip(range(1,len(self.seq)+1), sample_weights)), f)
 
-    def total_val_reward(self, sample_weights, restore_last=False):
+    def total_val_reward(self, sample_weights):
         # print(sample_weights)
 
         # model_save_path = os.path.join('out', self.bo_iter_output_path+'_boiter%s')%(self.seq, self.bs, self.n_iter, self.all_seed, self.bo_iter)
@@ -155,7 +156,7 @@ class MyWorker(Worker):
             '--pick_seq', 
             'random']
 
-        if restore_last:
+        if self.restore_last:
             training_cmd.append('--restore_last')
 
         output = subprocess.run(training_cmd, env=self.my_env, encoding='utf-8', 
