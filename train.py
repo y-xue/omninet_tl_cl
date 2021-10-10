@@ -558,7 +558,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
         step = counter.increment()
 
         if task == 'mm_ITV' or task == 'mm_seq10':
-            if not notest and evaluating(log, eval_interval, i):
+            if not notest and (evaluating(log, eval_interval, i) or i + 1 >= train_steps):
                 if i == (start+1) and not eval_first:
                     continue
                 # pretrained_dict=torch.load(os.path.join(model_save_path, 'best_val_model.pth'))
@@ -576,7 +576,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                         shared_model.restore(move_out_path, best_iteration)
                         optimizer.restore(move_out_path, best_iteration)
                         log_str += 'Restored existing model with iterations: %d\n' % (best_iteration)
-                        
+
                 model = shared_model
                 model = model.eval()
                 print('-' * 100)
