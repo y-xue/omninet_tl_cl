@@ -113,6 +113,7 @@ parser.add_argument('--unstructured_as_structured', action='store_true', help='I
 parser.add_argument('--unfreeze', default=[], nargs='+', type=str, help='indicates which peripheral to unfreeze')
 parser.add_argument('--logit_struct_periph_dim', default=512, type=int, help='logit_struct_periph_dim')
 parser.add_argument('--n_warmup_steps', default=16000, type=int, help='n_warmup_steps for ScheduledOptim')
+parser.add_argument('--large_seq_rewarding', action='store_true', help='evaluate only large sequences (> 1000 samples)')
 
 args = parser.parse_args()
 
@@ -347,6 +348,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 
         if task == 'mm_ITV':
             seq_lst = list(sample_idx['test'].keys())
+            seq_1000 = ['0-1-0','0-2-0','1-0-0','1-1-0','1-1-1','1-2-0','2-0-0','2-1-0','2-2-0']
+
             # seq_lst = ['1-0-0', '0-1-0', '0-0-1',
             #            '1-1-0', '0-2-0', '2-0-0', '1-0-1', '0-1-1',
             #            '1-2-0', '2-1-0', '1-1-1', '0-2-1', '2-0-1',
@@ -631,7 +634,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                     if rewarding:
                         val_reward = reward_ITTIV(seq, val_acc/100)
                         total_reward += val_reward
-
+                        
                     # summary_writer.add_scalar('Test_loss_%s'%seq, val_loss, step)
                     print('Step %d, %s, mm test loss: %f, Accuracy %f %%, reward: %f' % (step, seq, val_loss, val_acc, val_reward))
                     log_str += 'Step %d, %s, mm test loss: %f, Accuracy %f %%, reward: %f\n' % (step, seq, val_loss, val_acc, val_reward)
@@ -654,6 +657,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                 total = 0
                 total_correct = 0
                 total_reward = 0
+                total_reward_large_seq = 0
                 for seq, val_dl in zip(seq_lst, val_dl_lst):
                     if skip_seqs is not None and seq in skip_seqs:
                         continue
@@ -719,6 +723,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                     if rewarding:
                         val_reward = reward_ITTIV(seq, val_acc)
                         total_reward += val_reward
+                        if seq in seq_1000:
+                            total_reward_large_seq += val_reward
 
                     if step > overfitting_start and overfitting(seq, last_val_accs, val_acc, decrease_step_cnt, overfitting_threshold):
                         print('model is overfitted on %s'%seq)
@@ -751,8 +757,12 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 
                 total_val_acc = (total_correct/total)*100
 
-                if rewarding and total_reward > best_val_reward:
-                    best_val_reward = total_reward
+
+                treward = total_reward
+                if args.large_seq_rewarding:
+                    treward = total_reward_large_seq
+                if rewarding and treward > best_val_reward:
+                    best_val_reward = treward
                     best_iteration = step-1
                     print(best_iteration)
                     log_str += 'best_iteration:{}\n'.format(best_iteration)
@@ -780,8 +790,12 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                             'best_val_reward': best_val_reward
                             }, f)
 
-                print('Step %d, mm total validation Accuracy %f %%, reward: %f'%(step, total_val_acc, total_reward))
-                log_str += 'Step %d, mm total validation Accuracy %f %%, reward: %f\n'%(step, total_val_acc, total_reward)
+                if args.large_seq_rewarding:
+                    print('Step %d, mm total validation Accuracy %f %%, reward: %f, reward1000: %f'%(step, total_val_acc, total_reward, total_reward_large_seq))
+                    log_str += 'Step %d, mm total validation Accuracy %f %%, reward: %f, reward1000: %f\n'%(step, total_val_acc, total_reward, total_reward_large_seq)
+                else:
+                    print('Step %d, mm total validation Accuracy %f %%, reward: %f'%(step, total_val_acc, total_reward))
+                    log_str += 'Step %d, mm total validation Accuracy %f %%, reward: %f\n'%(step, total_val_acc, total_reward)
 
                 with open(move_out_path + '.log', 'a') as f: #open(os.path.join(model_save_path, 'log.txt'), 'a') as f:
                     print(log_str, file=f)

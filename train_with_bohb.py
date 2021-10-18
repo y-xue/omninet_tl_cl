@@ -25,6 +25,7 @@ parser.add_argument('--out_path', default='mm_nodup_data_random_seq_detect_overf
 parser.add_argument('--gpu_id', default='0', type=str, help='which gpu to use.')
 parser.add_argument('--port', default=9090, type=int, help='port')
 parser.add_argument('--n_random_init', default=None, type=int, help='min_points_in_model')
+parser.add_argument('--large_seq_rewarding', action='store_true', help='evaluate only large sequences (> 1000 samples)')
 
 args=parser.parse_args()
 
@@ -50,7 +51,7 @@ print('NameServer started')
 # Besides the sleep_interval, we need to define the nameserver information and
 # the same run_id as above. After that, we can start the worker in the background,
 # where it will wait for incoming configurations to evaluate.
-w = MyWorker(nameserver='127.0.0.1',nameserver_port=args.port,run_id=str(args.seed),seed=args.seed,out_path=args.out_path,gpu_id=args.gpu_id,lr=args.lr,n_warmup_steps=args.n_warmup_steps)
+w = MyWorker(nameserver='127.0.0.1',nameserver_port=args.port,run_id=str(args.seed),seed=args.seed,out_path=args.out_path,gpu_id=args.gpu_id,lr=args.lr,n_warmup_steps=args.n_warmup_steps,large_seq_rewarding=args.large_seq_rewarding)
 w.run(background=True)
 
 print('worker running')

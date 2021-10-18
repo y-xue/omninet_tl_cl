@@ -12,7 +12,7 @@ import random
 
 class MyWorker(Worker):
 
-    def __init__(self, *args, seed=1029, out_path='mm_random_seq_dropout_0.5_0.25_allseed219', gpu_id=0, xi=0.01, lr=0.01, n_warmup_steps=5000, restore_last=True, **kwargs):
+    def __init__(self, *args, seed=1029, out_path='mm_random_seq_dropout_0.5_0.25_allseed219', gpu_id=0, xi=0.01, lr=0.01, n_warmup_steps=5000, large_seq_rewarding=False, restore_last=True, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.xi = xi
@@ -27,6 +27,7 @@ class MyWorker(Worker):
         self.all_seed=seed #(1029 47 816 21 219 222 628 845 17 531 635)
         self.n_warmup_steps=n_warmup_steps
         self.restore_last = restore_last
+        self.large_seq_rewarding = large_seq_rewarding
         self.overfitting_threshold = 0.0001
         self.start_detect_overfitting_iter = 1000
 
@@ -158,6 +159,9 @@ class MyWorker(Worker):
 
         if self.restore_last:
             training_cmd.append('--restore_last')
+
+        if self.large_seq_rewarding:
+            training_cmd.append('--large_seq_rewarding')
 
         output = subprocess.run(training_cmd, env=self.my_env, encoding='utf-8', 
             stdout=subprocess.PIPE)
