@@ -31,7 +31,7 @@ run() {
 	i=$8
 	CUDA_VISIBLE_DEVICES=${cuda_device} python train_cl.py ${n_iter} ${task} ${bs} --n_gpus ${n_gpus} \
 	--save_interval ${save_intvl} --eval_interval ${eval_intvl} --save_best \
-	--model_save_path ${out_path}/mmcl/ITTIV_all/random_seq/seq_count/repeat3/ewc_all_other_tasks_${max_iter}_early_stop_cw${converge_window}_sw${safe_window}_restore_optimizer_lr/mmcl_random_seq_${seq}_${l1}_${l2}_${l3}_${l4}_${l5}ewc_lambda_lr${init_lr}_${bs}bs_${eval_intvl}eval_intvl_allseed$((all_seed[$all_seed_i]))_dataseed$((all_seed[$i]))_dropout_${dropout1}_${dropout2} \
+	--model_save_path ${out_path}/mmcl/ITTIV_all/random_seq/seq_count/repeat5_new/ewc_all_other_tasks_${max_iter}_early_stop_cw${converge_window}_sw${safe_window}_restore_optimizer_lr/mmcl_random_seq_${seq}_${l1}_${l2}_${l3}_${l4}_${l5}ewc_lambda_lr${init_lr}_${bs}bs_${eval_intvl}eval_intvl_allseed$((all_seed[$all_seed_i]))_dataseed$((all_seed[$i]))_dropout_${dropout1}_${dropout2} \
 	--sample_idx_fn sample_idx_cl_ITTIV_pT.7_no_dup_all_img_text_video_seed10 \
 	--peripherals_type timeline --conf_type timeline \
 	--all_seed $((all_seed[$all_seed_i])) --data_seed $((all_seed[$i])) \
