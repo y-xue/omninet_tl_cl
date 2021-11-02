@@ -137,6 +137,8 @@ data_path = args.data_path #'/files/yxue/research/allstate/data'
 coco_images = os.path.join(data_path, 'coco/train_val')
 caption_dir = os.path.join(data_path, 'coco')
 vqa_dir = os.path.join(data_path, 'vqa')
+socialiq_dir = os.path.join(data_path, 'socialiq')
+socialiq_video_folder = 'vision/videos_1fps_640-360_resized'
 # structured_path = os.path.join(data_path, 'vqa/structured_seed951')
 # structured_path = os.path.join(data_path, 'vqa/structured_random_cache_type_0_cos_sim_0_multi_cache_topN_data_seed951')
 structured_path = os.path.join(data_path, 'vqa', args.structured_folder)
@@ -342,6 +344,26 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                 filter(lambda x: x.requires_grad, shared_model.parameters()),
                 betas=(0.9, 0.98), eps=1e-09),
             512, args.n_warmup_steps,restore,max_lr=0.0001,init_lr=args.init_lr)
+    elif task == 'socialiq':
+        full_seq = 'QATV'
+        seq_lst = [full_seq[:(i+1)] for i in range(len(full_seq))]
+
+        if sample_weights_fn is not None and os.path.exists(os.path.join(socialiq_dir, sample_weights_fn)):
+            with open(os.path.join(socialiq_dir, sample_weights_fn), 'r') as f:
+                predefined_sample_weights = json.load(f)
+        else:
+            predefined_sample_weights = None
+
+        dl_lst, val_dl_lst, test_dl_lst = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=n_workers, batch_size=batch_size, clip_len=30, data_seed=args.data_seed)
+        DLS = [iter(cycle(tr_dl)) for tr_dl in dl_lst]
+        dl_ids = iter(cycle(range(len(dl_lst))))
+
+        optimizer = ScheduledOptim(
+            Adam(
+                filter(lambda x: x.requires_grad, shared_model.parameters()),
+                betas=(0.9, 0.98), eps=1e-09),
+            512, args.n_warmup_steps,restore,max_lr=0.0001,init_lr=args.init_lr)
+
     elif task == 'mm_ITV' or task == 'mm_seq10':
         with open(os.path.join(mm_dir, sample_idx_fn), 'rb') as f:
             sample_idx = pickle.load(f)
@@ -560,7 +582,221 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
         # Calculate loss
         step = counter.increment()
 
-        if task == 'mm_ITV' or task == 'mm_seq10':
+        if task == 'socialiq':
+            if not notest and (evaluating(log, eval_interval, i) or i + 1 >= train_steps):
+                if i == (start+1) and not eval_first:
+                    continue
+
+                if i + 1 >= train_steps:
+                    if save_best:
+                        shared_model.restore(move_out_path, 'best/0')
+                        optimizer.restore(move_out_path, 'best/0')
+                        log_str += 'Restored existing best model\n'
+                    else:
+                        shared_model.restore(move_out_path, best_iteration)
+                        optimizer.restore(move_out_path, best_iteration)
+                        log_str += 'Restored existing model with iterations: %d\n' % (best_iteration)
+
+                model = shared_model
+                model = model.eval()
+                print('-' * 100)
+                print('Test model')
+                log_str += '-' * 100 + '\nTest model\n'
+
+                total = 0
+                total_correct = 0
+                total_reward = 0
+                total_reward_linear = 0
+                for seq, val_dl in zip(seq_lst, test_dl_lst):
+                    print(seq)
+                    log_str += '{}\n'.format(seq)
+                    val_loss = 0
+                    loss_total = 0
+                    val_correct = 0
+                    val_total = 0
+                    val_reward = 0
+                    for b in val_dl:
+                        ques = b['ques']
+                        answers = b['ans']
+                        videos = b['videos']
+                        audios = b['audios']
+                        trs = b['trs']
+                        sample_weights = b['sw']
+                        labels = b['labels']
+                        if gpu_id >= 0:
+                            # ques = send_to_device(ques, gpu_id)
+                            # answers = send_to_device(answers, gpu_id)
+                            videos = send_to_device(videos, gpu_id)
+                            audios = send_to_device(audios, gpu_id)
+                            # trs = send_to_device(trs, gpu_id)
+                            labels = send_to_device(labels, gpu_id)
+                            sample_weights = send_to_device(sample_weights, gpu_id)
+                            # answers=answers.cuda(device=gpu_id)
+                        pred, loss, acc, n_correct, n_total = r.socialiq(model, ques, answers, videos, audios, trs, targets=labels, sample_weights=sample_weights, return_str_preds=True)
+                        val_loss += float(loss.detach().cpu().numpy())
+                        loss_total += 1
+                        val_correct += n_correct
+                        val_total += n_total
+
+                    val_loss/=loss_total
+                    total_correct += val_correct
+                    total += val_total
+
+                    val_acc = (val_correct/val_total)*100
+                    if rewarding:
+                        val_reward = reward_SIQ(seq, val_acc/100)
+                        total_reward += val_reward
+                        val_reward_linear = reward_SIQ_linear(seq, val_acc/100)
+                        total_reward_linear += val_reward_linear
+                        
+                    # summary_writer.add_scalar('Test_loss_%s'%seq, val_loss, step)
+                    print('Step %d, %s, SIQ test loss: %f, Accuracy %f %%, reward: %f' % (step, seq, val_loss, val_acc, val_reward))
+                    log_str += 'Step %d, %s, SIQ test loss: %f, Accuracy %f %%, reward: %f\n' % (step, seq, val_loss, val_acc, val_reward)
+
+                print('-' * 100)
+                log_str += '-' * 100 + '\n'
+                total_val_acc = (total_correct/total)*100
+                print('Step %d, SIQ total test Accuracy %f %%, reward: %f, reward_linear: %f'%(step, total_val_acc, total_reward, total_reward_linear))
+                log_str += 'Step %d, SIQ total test Accuracy %f %%, reward: %f, reward_linear: %f\n'%(step, total_val_acc, total_reward, total_reward_linear)
+
+            if not test and evaluating(log, eval_interval, i):
+                if i == (start+1) and not eval_first:
+                    continue
+            # if (log and eval_interval is not None and i % eval_interval == 0 and ((i == start and eval_first) or i > start))):
+                model = model.eval()
+                print('-' * 100)
+                print('Evaluation step')
+                log_str += '-' * 100 + '\nEvaluation step\n'
+
+                total = 0
+                total_correct = 0
+                total_reward = 0
+                total_reward_linear = 0
+                for seq, val_dl in zip(seq_lst, val_dl_lst):
+                    val_loss = 0
+                    loss_total = 0
+                    val_correct = 0
+                    val_total = 0
+                    val_reward = 0
+                    start_time = time.time()
+                    
+                    for b in val_dl: 
+                        ques = b['ques']
+                        answers = b['ans']
+                        videos = b['videos']
+                        audios = b['audios']
+                        trs = b['trs']
+                        sample_weights = b['sw']
+                        labels = b['labels']
+                        if gpu_id >= 0:
+                            # ques = send_to_device(ques, gpu_id)
+                            # answers = send_to_device(answers, gpu_id)
+                            videos = send_to_device(videos, gpu_id)
+                            audios = send_to_device(audios, gpu_id)
+                            # trs = send_to_device(trs, gpu_id)
+                            labels = send_to_device(labels, gpu_id)
+                            sample_weights = send_to_device(sample_weights, gpu_id)
+                            # answers=answers.cuda(device=gpu_id)
+                        pred, loss, acc, n_correct, n_total = r.socialiq(model, ques, answers, videos, audios, trs, targets=labels, sample_weights=sample_weights, return_str_preds=True)
+                        val_loss += float(loss.detach().cpu().numpy())
+                        loss_total += 1
+                        val_correct += n_correct
+                        val_total += n_total
+
+                    val_loss/=loss_total
+                    total_correct += val_correct
+                    total += val_total
+
+                    val_acc = (val_correct/val_total)
+                    if rewarding:
+                        val_reward = reward_SIQ(seq, val_acc)
+                        total_reward += val_reward
+                        val_reward_linear = reward_SIQ_linear(seq, val_acc)
+                        total_reward_linear += val_reward_linear
+                        
+                    # summary_writer.add_scalar('Val_loss_%s'%seq, val_loss, step)
+                    print('Step %d, %s, SIQ validation loss: %f, Accuracy %f %%, reward: %f' % (step, seq, val_loss,val_acc*100,val_reward))
+                    log_str += 'Step %d, %s, SIQ validation loss: %f, Accuracy %f %%, reward: %f\n' % (step, seq, val_loss,val_acc*100,val_reward)
+                    end_time = time.time()
+                    print('Step {}, {}, validation takes {:.2f}s\n'.format(step, seq, end_time - start_time))
+                    log_str += 'Step {}, {}, validation takes {:.2f}s\n'.format(step, seq, end_time - start_time)
+                    
+
+                print('-' * 100)
+                log_str += '-' * 100 + '\n'
+                total_val_acc = (total_correct/total)*100
+
+                if rewarding and total_reward > best_val_reward:
+                    best_val_reward = total_reward
+                    best_iteration = step-1
+                    print(best_iteration)
+                    log_str += 'best_iteration:{}\n'.format(best_iteration)
+
+                    if save_best:
+                        shared_model.save(move_out_path, 'best/0')
+                        optimizer.save(move_out_path, 'best/0')
+
+                if not rewarding and total_val_acc > best_val_acc:
+                    best_val_acc = total_val_acc
+                    best_iteration = step-1
+                    print(best_iteration)
+                    log_str += 'best_iteration:{}\n'.format(best_iteration)
+
+                    if save_best:
+                        shared_model.save(move_out_path, 'best/0')
+                        optimizer.save(move_out_path, 'best/0')
+
+                with open(move_out_path + '/best/acc.pkl', 'wb') as f:
+                        pickle.dump({
+                            'best_val_acc': best_val_acc, 
+                            'best_iteration': best_iteration,
+                            'best_val_reward': best_val_reward
+                            }, f)
+
+                print('Step %d, SIQ total validation Accuracy %f %%, reward: %f, reward_linear: %f'%(step, total_val_acc, total_reward, total_reward_linear))
+                log_str += 'Step %d, SIQ total validation Accuracy %f %%, reward: %f, reward_linear: %f\n'%(step, total_val_acc, total_reward, total_reward_linear)
+
+                with open(move_out_path + '.log', 'a') as f: #open(os.path.join(model_save_path, 'log.txt'), 'a') as f:
+                    print(log_str, file=f)
+                    log_str = ''
+
+                model = model.train()
+                continue
+
+            if not test:
+                next_dl_id = np.random.choice(range(len(full_seq)))
+                DL = DLS[next_dl_id]
+                seq = seq_lst[next_dl_id]
+
+                batch = next(DL)
+                
+                ques = b['ques']
+                answers = b['ans']
+                videos = b['videos']
+                audios = b['audios']
+                trs = b['trs']
+                sample_weights = b['sw']
+                labels = b['labels']
+                if gpu_id >= 0:
+                    # ques = send_to_device(ques, gpu_id)
+                    # answers = send_to_device(answers, gpu_id)
+                    videos = send_to_device(videos, gpu_id)
+                    audios = send_to_device(audios, gpu_id)
+                    # trs = send_to_device(trs, gpu_id)
+                    labels = send_to_device(labels, gpu_id)
+                    sample_weights = send_to_device(sample_weights, gpu_id)
+                    # answers=answers.cuda(device=gpu_id)
+                pred, loss, acc, n_correct, n_total = r.socialiq(model, ques, answers, videos, audios, trs, targets=labels, sample_weights=sample_weights, return_str_preds=True)
+                
+                loss.backward()
+                loss=loss.detach()
+
+                # if log:
+                #     summary_writer.add_scalar('Loss_%s'%seq, loss, step)
+                print('Step %d, %s, SIQ Loss: %f, Accuracy:  %f %%' % (step, seq, loss,acc))
+                log_str += 'Step %d, %s, SIQ Loss: %f, Accuracy:  %f %%\n' % (step, seq, loss,acc)
+
+        elif task == 'mm_ITV' or task == 'mm_seq10':
             if not notest and (evaluating(log, eval_interval, i) or i + 1 >= train_steps):
                 if i == (start+1) and not eval_first:
                     continue

@@ -57,7 +57,7 @@ def defaultconf():
             'struct_temp': False, 'struct_spat': False}
     }
 
-    domains = ['ENGLISH','GERMAN','IMAGE', 'STRUCT', 'STRUCT_SPAT', 'STRUCT_TEMP']
+    domains = ['ENGLISH','GERMAN','IMAGE', 'STRUCT', 'STRUCT_SPAT', 'STRUCT_TEMP', 'TIME', 'AUDIO']
 
     return cnp_conf, perph_conf, domains
 

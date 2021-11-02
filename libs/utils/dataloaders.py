@@ -39,7 +39,7 @@ import pandas as pd
 # the following is required for the lib to work in terminal env
 import matplotlib
 
-matplotlib.use("agg", warn=False, force=True)
+# matplotlib.use("agg", warn=False, force=True)
 from .cocoapi.coco import COCO
 
 
@@ -1609,6 +1609,228 @@ def mm_collate_fn(data):
 #         'gps': collate_gps if len(collate_gps) != 0 else None,
 #         'labels': collate_labels
 #     }
+
+
+"""
+qa0-0,ac0,tr0,v0
+qa0-1,ac0,tr0,v0
+...
+qa0-5,ac0,tr0,v0
+qa1-0,ac1,tr1,v1
+qa1-1,ac1,tr1,v1
+...
+qa1-5,ac1,tr1,v1
+
+Q-A-T-V
+
+"""
+
+class social_iq_dataset(Dataset):
+    def __init__(self, seq, sample_weights, data_dir, video_folder, split_dict, split='train', clip_len=30, h=300, w=300):
+        self.seq = seq
+        if sample_weights is not None:
+            self.sw = sample_weights[str(len(seq))]
+        else:
+            self.sw = None
+        self.clip_len = clip_len
+        self.split = split
+        self.resize_height = h
+        self.resize_width = w
+        self.crop_size = 224
+        
+        # Obtain all the filenames of files inside all the class folders
+        # Going through each class folder one at a time
+        self.fnames = []
+        self.ques = []
+        self.ans = []
+        self.labels = []
+        self.vnames = []
+
+        with open(os.path.join(data_dir,'train/qa.dict.pkl'), 'rb') as f:
+            qa = pickle.load(f)
+
+        for d in qa.values():
+            if d['video_name'] == 'deKPBy_uLkg_trimmed-out' or (
+                split_dict[d['video_name']] != split):
+                # deKPBy_uLkg_trimmed-out is too short
+                continue
+
+            self.ques.append(d['question'])
+            self.ans.append(d['answer'])
+            self.labels.append(d['label'])
+
+            vname = d['video_name']
+
+            self.vnames.append(vname)
+
+            if 'V' in seq:
+                self.fnames.append(os.path.join(data_dir, 'train', video_folder, vname))
+            
+        if 'T' in seq:
+            transcripts = h5py.File(data_dir+'/deployed/SOCIAL_IQ_TRANSCRIPT_RAW_CHUNKS_BERT.csd','r')['SOCIAL_IQ_TRANSCRIPT_RAW_CHUNKS_BERT']['data']
+            self.trs_features = {}
+            for k in transcripts:
+                this_trs = np.array(transcripts[k]['features'][:,-768:])
+                this_trs = np.concatenate([this_trs,np.zeros([25,768])],axis=0)[:25,:]
+                self.trs_features[k] = this_trs
+        
+        if 'A' in seq:
+            audios = h5py.File(data_dir+'/deployed/SOCIAL_IQ_COVAREP.csd','r')['SOCIAL_IQ_COVAREP']['data']
+            self.audio_features = {}
+            for k in audios:
+                this_audio = np.array(audios[k]['features'])
+                np.nan_to_num(this_audio)
+                this_audio = np.concatenate([this_audio,np.zeros([25,74])],axis=0)[:25,:]
+                self.audio_features[k] = this_trs
+            
+    def __len__(self):
+        return len(self.fnames)
+
+    def __getitem__(self, index):
+        audio, trs, video = None, None, None
+        k = self.vnames[index]
+        if 'A' in self.seq:
+            audio = torch.from_numpy(self.audio_features[k])
+        if 'T' in self.seq:
+            trs = torch.from_numpy(self.trs_features[k])
+        if 'V' in self.seq:
+            buffer = self.load_frames(self.fnames[index])
+            buffer = self.crop(buffer, self.clip_len, self.crop_size)
+            if self.split == 'train':
+                # Perform data augmentation
+                buffer = self.randomflip(buffer)
+            buffer = self.normalize(buffer)
+            buffer = self.to_tensor(buffer)
+            video = torch.from_numpy(buffer)
+
+        sw = self.sw if self.sw is not None else 1.0
+        return {
+            'ques': self.ques[index], 'ans': self.ans[index], 
+            'label': self.labels[index], 'video': video,
+            'audio': audio, 'trs': trs, 'sw': sw
+        }
+        # return torch.from_numpy(buffer), torch.from_numpy(labels).unsqueeze(0)
+
+    def randomflip(self, buffer):
+        """Horizontally flip the given image and ground truth randomly with a probability of 0.5."""
+
+        if np.random.random() < 0.5:
+            for i, frame in enumerate(buffer):
+                frame = cv2.flip(buffer[i], flipCode=1)
+                buffer[i] = cv2.flip(frame, flipCode=1)
+
+        return buffer
+
+    def normalize(self, buffer):
+        buffer=buffer/255
+        for i, frame in enumerate(buffer):
+            frame -= np.array([[[0.485, 0.456, 0.406]]])
+            frame /= np.array([[[0.229, 0.224, 0.225]]])
+            buffer[i] = frame
+
+        return buffer
+    
+    def to_tensor(self, buffer):
+        return buffer.transpose((0, 3, 1, 2))
+    
+    def crop(self, buffer, clip_len, crop_size):
+        # randomly select time index for temporal jittering
+        if buffer.shape[0] - clip_len>0 and self.split=='train':
+            time_index = np.random.randint(buffer.shape[0] - clip_len)
+        else:
+            time_index=0
+        # Randomly select start indices in order to crop the video
+        if self.split=='train':
+            height_index = np.random.randint(buffer.shape[1] - crop_size)
+            width_index = np.random.randint(buffer.shape[2] - crop_size)
+        else:
+            height_index=0
+            width_index=0
+
+        # Crop and jitter the video using indexing. The spatial crop is performed on
+        # the entire array, so each frame is cropped in the same location. The temporal
+        # jitter takes place via the selection of consecutive frames
+        buffer = buffer[time_index:time_index + clip_len,
+                 height_index:height_index + crop_size,
+                 width_index:width_index + crop_size, :]
+
+        return buffer
+
+    def load_frames(self, file_dir):
+        frames = sorted([os.path.join(file_dir, img) for img in os.listdir(file_dir)])
+        frame_count = len(frames)
+        buffer = np.empty((frame_count, self.resize_height, self.resize_width, 3), np.dtype('float32'))
+        for i, frame_name in enumerate(frames):
+            frame = np.array(cv2.imread(frame_name)).astype(np.float64)
+            buffer[i] = frame
+
+        return buffer
+
+
+def social_iq_batchgen(data_dir, video_folder, full_seq, sample_weights, seq_lst=None, num_workers=1, batch_size=1, structured_path=None, clip_len=30, data_seed=68):
+    random.seed(data_seed)
+    np.random.seed(data_seed)
+    torch.manual_seed(data_seed)
+
+    with open(os.path.join(data_dir, 'train/split_with_test.dict.pkl'), 'rb') as f:
+        split_dict = pickle.load(f)
+
+    dl_lst, val_dl_lst, test_dl_lst = [], [], []
+
+    if seq_lst is None:
+        seq_lst = [full_seq[:(i+1)] for i in range(len(full_seq))]
+
+    for seq in seq_lst:
+        dataset = social_iq_dataset(seq, sample_weights, data_dir, video_folder, split_dict, split='train', clip_len=clip_len)
+        dl_lst.append(DataLoader(dataset, num_workers=num_workers, batch_size=batch_size, shuffle=True,
+                                     collate_fn=social_iq_collate_fn, drop_last=True,pin_memory=True))
+        
+        print('# of training mini-batches:', len(dataloader))
+        val_dataset = social_iq_dataset(seq, sample_weights, data_dir, video_folder, split_dict, split='val', clip_len=clip_len)
+        val_dl_lst.append(DataLoader(val_dataset, num_workers=num_workers, batch_size=max(int(batch_size/2),1), shuffle=True,
+                                     collate_fn=social_iq_collate_fn, drop_last=False))
+        
+        test_dataset = social_iq_dataset(seq, sample_weights, data_dir, video_folder, split_dict, split='test', clip_len=clip_len)
+        test_dl_lst.append(DataLoader(test_dataset, num_workers=0, batch_size=max(int(batch_size/2),1), shuffle=True,
+                                     collate_fn=social_iq_collate_fn, drop_last=False))
+    
+    return dl_lst, val_dl_lst, test_dl_lst
+
+def social_iq_collate_fn(data):
+    def selective_append(lst, x):
+        if x is not None:
+            lst.append(x)
+
+    collate_ques = []
+    collate_ans = []
+    collate_labels = []
+    collate_audios = []
+    collate_trs = []
+    collate_videos = []
+    collate_w=[]
+    for d in data:
+        selective_append(collate_ques, d['ques'])
+        selective_append(collate_ans, d['ans'])
+        selective_append(collate_labels, (d['label']))
+        selective_append(collate_audios, d['audio'])
+        selective_append(collate_trs, d['trs'])
+        selective_append(collate_videos, d['video'])
+        selective_append(collate_w, d['sw'])
+        
+    collate_audios = torch.stack(collate_audios, dim=0) if len(collate_audios) != 0 else None
+    collate_trs = torch.stack(collate_trs, dim=0) if len(collate_trs) != 0 else None
+    collate_videos = torch.stack(collate_videos, dim=0) if len(collate_videos) != 0 else None
+    collate_labels=torch.tensor(collate_labels).reshape([-1,1])
+    collate_w=torch.tensor(collate_w).reshape([-1,1])
+    return {
+        'ques': collate_ques,
+        'ans': collate_ans,
+        'labels': collate_labels,
+        'audios': collate_audios,
+        'trs': collate_trs,
+        'videos': collate_videos,
+        'sw': collate_w
+    }
 
 class mm_vqa_dataset(Dataset):
     def __init__(self, ques_file, ann_file, image_dir,vocab_file, transforms=None):

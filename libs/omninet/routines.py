@@ -25,6 +25,33 @@ import torch
 import torch.nn as nn
 import numpy as np
 
+def socialiq(omninet,ques,answers,videos,audios,trs,targets=None,sample_weights=None,return_str_preds=False):
+    batch_size = len(ques)
+    omninet.reset(batch_size)
+
+    if videos is not None:
+        shape=videos.shape
+        omninet.encode_videos(videos)
+
+    omninet.encode_englishtexts(ques)
+    omninet.encode_englishtexts(answers)
+
+    if audios is not None:
+        omninet.encode_audios(audios)
+
+    if trs is not None:
+        omninet.encode_englishtexts(trs, no_periph=True)
+
+    predictions = omninet.decode_greedy('SIQ', num_steps=1)
+
+    if targets is not None:
+        loss, acc, n_correct, n_total = calc_nll_loss_and_acc(predictions,targets,sample_weights=sample_weights)
+    else:
+        loss,acc=None, None
+    if return_str_preds:
+        predictions = predictions.argmax(-1)
+    return predictions, loss, acc, n_correct, n_total
+
 def mm(omninet,images,text,videos,structured,targets=None,mode='train',return_str_preds=False,num_steps=1,sample_weights=None):
     # allstate multi-modal routine
 
