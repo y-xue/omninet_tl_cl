@@ -40,7 +40,7 @@ def socialiq(omninet,ques,answers,videos,audios,trs,targets=None,sample_weights=
         omninet.encode_audios(audios)
 
     if trs is not None:
-        omninet.encode_englishtexts(trs, no_periph=True)
+        omninet.encode_trs(trs)
 
     predictions = omninet.decode_greedy('SIQ', num_steps=1)
 

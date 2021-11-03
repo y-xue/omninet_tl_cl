@@ -49,6 +49,7 @@ def defaultconf():
         'penn_output_classes':48,
         'birds_output_classes':200,
         'mm_output_classes':2,
+        'SIQ_output_classes':2,
         'image_struct_clf_output_classes':2,
         'struct_dropout': 0.1,
         'struct_temp_dropout': 0.1,

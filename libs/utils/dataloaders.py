@@ -1679,7 +1679,7 @@ class social_iq_dataset(Dataset):
             self.audio_features = {}
             for k in audios:
                 this_audio = np.array(audios[k]['features'])
-                np.nan_to_num(this_audio)
+                this_audio = np.nan_to_num(this_audio)
                 this_audio = np.concatenate([this_audio,np.zeros([25,74])],axis=0)[:25,:]
                 self.audio_features[k] = this_audio
             
@@ -1693,6 +1693,8 @@ class social_iq_dataset(Dataset):
             audio = torch.from_numpy(self.audio_features[k])
         if 'T' in self.seq:
             trs = torch.from_numpy(self.trs_features[k])
+            if trs.sum() == 0:
+                trs = None
         if 'V' in self.seq:
             buffer = self.load_frames(self.fnames[index])
             buffer = self.crop(buffer, self.clip_len, self.crop_size)

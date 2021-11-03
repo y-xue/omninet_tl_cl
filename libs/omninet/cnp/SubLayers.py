@@ -275,7 +275,7 @@ class MultiHeadAttention(nn.Module):
 
         if mask is not None:
             # print('MHA mask.shape: ', mask.size())
-            mask = mask.repeat(n_head, 1, 1) # (n*b) x .. x ..
+            mask = mask.repeat(n_head, 1, 1).bool() # (n*b) x .. x ..
             # print('MHA mask.shape after repeat: ', mask.size())
         output, attn = self.attention(q, k, v, mask=mask,k_gate=k_gate)
 

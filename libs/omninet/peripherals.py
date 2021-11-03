@@ -422,11 +422,12 @@ class FeaturePeripheral(base_peripheral):
         self.output_fc = nn.Linear(input_dim, output_dim)
         self.gpu_id = gpu_id
 
-    def encode(self, s):
+    def forward(self, s):
         if self.gpu_id > -1:
             s = s.cuda(self.gpu_id)
+        input_pad_mask = s.sum(dim=2)==0
         output_enc=self.output_fc(s)
-        return output_enc.unsqueeze(2)
+        return output_enc.unsqueeze(2), input_pad_mask
 
 class StructuredPeripheral(base_peripheral):
     def __init__(self,output_dim,dropout=0,freeze_layers=True,unstructured_as_structured=False):

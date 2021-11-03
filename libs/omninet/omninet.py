@@ -59,7 +59,9 @@ class OmniNet(nn.Module):
                  'IMAGE_STRUCT_CLF':pc['image_struct_clf_output_classes'], 
                  'VQA_struct':pc['vqa_output_vocab'], 
                  'birds':pc['birds_output_classes'],'birds_struct':pc['birds_output_classes'],
-                 'mm':pc['mm_output_classes'], 'mm_ITV':pc['mm_output_classes'], 'mm_vqa':pc['vqa_output_vocab']}
+                 'mm':pc['mm_output_classes'], 'mm_ITV':pc['mm_output_classes'], 'mm_vqa':pc['vqa_output_vocab'],
+                 'SIQ':pc['SIQ_output_classes']
+                 }
         # tasks = {'PENN': pc['penn_output_classes'], 'HMDB':pc['hmdb_output_classes'],
         #          'IMAGE_CAPTION':pc['english_language_output_vocab'],'VQA':pc['vqa_output_vocab']}
         self.cnp = CNP(tasks,conf=cc,domains=d, gpu_id=gpu_id)
@@ -188,13 +190,12 @@ class OmniNet(nn.Module):
         # return input_pad_mask
 
     def encode_trs(self, trs, domain='ENGLISH'):
-        input_pad_mask = trs.sum(dim=2)==0
-        sent_encodings = self.trs_perph(trs).unsqueeze(2)
+        sent_encodings, input_pad_mask = self.trs_perph(trs)
         self.cnp.encode(sent_encodings, pad_mask=input_pad_mask, domain=domain)
 
     def encode_audios(self, audios, domain='AUDIO'):
-        input_pad_mask = audios.sum(dim=2)==0
-        self.cnp.encode(self.audio_perph(audios).unsqueeze(2), pad_mask=input_pad_mask, domain=domain)
+        audio_encodings, input_pad_mask = self.audio_perph(audios)
+        self.cnp.encode(audio_encodings, pad_mask=input_pad_mask, domain=domain)
 
     def encode_structured(self,structured,fusion=False):
         if self.cnp.inject_at_logits:
