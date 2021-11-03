@@ -167,15 +167,11 @@ class OmniNet(nn.Module):
     
         return self.cnp.encode(image_encodings,domain=domain,bbox_mask=bbox_mask,features=whole_image_encodings)
     
-    def encode_englishtexts(self,texts,domain='ENGLISH',fusion=False,no_periph=False):
+    def encode_englishtexts(self,texts,domain='ENGLISH',fusion=False):
         # print('encode_englishtexts')
-        if no_periph:
-            input_pad_mask = text.sum(dim=2)==0
-            sent_encodings = text
-        else:
-            sent_encodings,input_pad_mask=self.english_language_perph.embed_sentences(texts, tokenized=False)
-            if fusion:
-                return self.cnp.encode_fusion(sent_encodings, pad_mask=input_pad_mask, domain=domain)
+        sent_encodings,input_pad_mask=self.english_language_perph.embed_sentences(texts, tokenized=False)
+        if fusion:
+            return self.cnp.encode_fusion(sent_encodings, pad_mask=input_pad_mask, domain=domain)
 
         return self.cnp.encode(sent_encodings, pad_mask=input_pad_mask, domain=domain)
 
@@ -191,9 +187,14 @@ class OmniNet(nn.Module):
             
         # return input_pad_mask
 
+    def encode_trs(self, trs, domain='ENGLISH'):
+        input_pad_mask = trs.sum(dim=2)==0
+        sent_encodings = self.trs_perph(trs).unsqueeze(2)
+        self.cnp.encode(sent_encodings, pad_mask=input_pad_mask, domain=domain)
+
     def encode_audios(self, audios, domain='AUDIO'):
         input_pad_mask = audios.sum(dim=2)==0
-        self.cnp.encode(audios.unsqueeze(2), pad_mask=input_pad_mask, domain=domain)
+        self.cnp.encode(self.audio_perph(audios).unsqueeze(2), pad_mask=input_pad_mask, domain=domain)
 
     def encode_structured(self,structured,fusion=False):
         if self.cnp.inject_at_logits:
