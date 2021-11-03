@@ -78,6 +78,8 @@ class OmniNet(nn.Module):
                                                                         output_dim=cc['input_dim'],
                                                                         lang='de',
                                                                         gpu_id=gpu_id)
+            self.audio_perph = FeaturePeripheral(74,cc['input_dim'],gpu_id=gpu_id)
+            self.trs_perph = FeaturePeripheral(768,cc['input_dim'],gpu_id=gpu_id)
             self.video_input_perph = None
             self.struct_spat_perph = StructuredSpatialPeripheral(output_dim=cc['input_dim'],dropout=pc['struct_spat_dropout'],
                                             unstructured_as_structured=unstructured_as_structured,
@@ -191,7 +193,7 @@ class OmniNet(nn.Module):
 
     def encode_audios(self, audios, domain='AUDIO'):
         input_pad_mask = audios.sum(dim=2)==0
-        self.cnp.encode(audios, pad_mask=input_pad_mask, domain=domain)
+        self.cnp.encode(audios.unsqueeze(2), pad_mask=input_pad_mask, domain=domain)
 
     def encode_structured(self,structured,fusion=False):
         if self.cnp.inject_at_logits:

@@ -28,6 +28,7 @@ import numpy as np
 import json
 import tqdm
 import random
+import h5py
 from sklearn.model_selection import train_test_split
 from PIL import Image
 from bpemb import BPEmb
@@ -1660,8 +1661,7 @@ class social_iq_dataset(Dataset):
             self.labels.append(d['label'])
 
             vname = d['video_name']
-
-            self.vnames.append(vname)
+            self.vnames.append(vname[:11]) # remove suffix such as  '_trimmed-out'
 
             if 'V' in seq:
                 self.fnames.append(os.path.join(data_dir, 'train', video_folder, vname))
@@ -1681,10 +1681,10 @@ class social_iq_dataset(Dataset):
                 this_audio = np.array(audios[k]['features'])
                 np.nan_to_num(this_audio)
                 this_audio = np.concatenate([this_audio,np.zeros([25,74])],axis=0)[:25,:]
-                self.audio_features[k] = this_trs
+                self.audio_features[k] = this_audio
             
     def __len__(self):
-        return len(self.fnames)
+        return len(self.ques)
 
     def __getitem__(self, index):
         audio, trs, video = None, None, None
@@ -1782,10 +1782,10 @@ def social_iq_batchgen(data_dir, video_folder, full_seq, sample_weights, seq_lst
 
     for seq in seq_lst:
         dataset = social_iq_dataset(seq, sample_weights, data_dir, video_folder, split_dict, split='train', clip_len=clip_len)
-        dl_lst.append(DataLoader(dataset, num_workers=num_workers, batch_size=batch_size, shuffle=True,
-                                     collate_fn=social_iq_collate_fn, drop_last=True,pin_memory=True))
-        
+        dataloader = DataLoader(dataset, num_workers=num_workers, batch_size=batch_size, shuffle=True,
+                                     collate_fn=social_iq_collate_fn, drop_last=True,pin_memory=True)
         print('# of training mini-batches:', len(dataloader))
+        dl_lst.append(dataloader)
         val_dataset = social_iq_dataset(seq, sample_weights, data_dir, video_folder, split_dict, split='val', clip_len=clip_len)
         val_dl_lst.append(DataLoader(val_dataset, num_workers=num_workers, batch_size=max(int(batch_size/2),1), shuffle=True,
                                      collate_fn=social_iq_collate_fn, drop_last=False))

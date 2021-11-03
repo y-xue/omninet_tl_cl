@@ -416,6 +416,18 @@ class LanguagePeripheral(base_peripheral):
     def id_EOS(self):
         return 2
 
+class FeaturePeripheral(base_peripheral):
+    def __init__(self,input_dim,output_dim,gpu_id=-1):
+        super(FeaturePeripheral,self).__init__()
+        self.output_fc = nn.Linear(input_dim, output_dim)
+        self.gpu_id = gpu_id
+
+    def encode(self, s):
+        if self.gpu_id > -1:
+            s = s.cuda(self.gpu_id)
+        output_enc=self.output_fc(s)
+        return output_enc.unsqueeze(2)
+
 class StructuredPeripheral(base_peripheral):
     def __init__(self,output_dim,dropout=0,freeze_layers=True,unstructured_as_structured=False):
         super(StructuredPeripheral,self).__init__()

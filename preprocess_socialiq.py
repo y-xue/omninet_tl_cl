@@ -1,5 +1,6 @@
 import os
 import pickle
+import numpy as np
 
 data_dir = '/files/yxue/research/allstate/data/socialiq'
 train_video_dir = data_dir+'_raw/train/vision/raw'

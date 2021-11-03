@@ -65,7 +65,7 @@ parser.add_argument('--with_val', action='store_true', help='True if run on trai
 parser.add_argument('--structured_folder', default='synthetic_structured_clustering_std2_valAcc66', help='path to structured data.')
 parser.add_argument('--norm_weights', action='store_true', help='True if normalize sample weights by instance.')
 parser.add_argument('--scale_weights', action='store_true', help='True if scale weights by total number of modalities.')
-parser.add_argument('--sample_weights_fn', default='sample_weights_1.json', help='file name of predefined sample weights.')
+parser.add_argument('--sample_weights_fn', default=None, help='file name of predefined sample weights.')
 parser.add_argument('--sample_idx_fn', default='sample_idx_ITTIV_pT.9_35k-15k-15k', help='file name of sample_idx.')
 parser.add_argument('--peripherals_type', default='default', help='Choose peripherals types')
 parser.add_argument('--conf_type', default='default', help='Choose confurigation types')
@@ -354,7 +354,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
         else:
             predefined_sample_weights = None
 
-        dl_lst, val_dl_lst, test_dl_lst = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=n_workers, batch_size=batch_size, clip_len=30, data_seed=args.data_seed)
+        dl_lst, val_dl_lst, test_dl_lst = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=n_workers, batch_size=batch_size, clip_len=16, data_seed=args.data_seed)
         DLS = [iter(cycle(tr_dl)) for tr_dl in dl_lst]
         dl_ids = iter(cycle(range(len(dl_lst))))
 
@@ -627,7 +627,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                             # ques = send_to_device(ques, gpu_id)
                             # answers = send_to_device(answers, gpu_id)
                             videos = send_to_device(videos, gpu_id)
-                            audios = send_to_device(audios, gpu_id)
+                            # audios = send_to_device(audios, gpu_id)
                             # trs = send_to_device(trs, gpu_id)
                             labels = send_to_device(labels, gpu_id)
                             sample_weights = send_to_device(sample_weights, gpu_id)
@@ -692,7 +692,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                             # ques = send_to_device(ques, gpu_id)
                             # answers = send_to_device(answers, gpu_id)
                             videos = send_to_device(videos, gpu_id)
-                            audios = send_to_device(audios, gpu_id)
+                            # audios = send_to_device(audios, gpu_id)
                             # trs = send_to_device(trs, gpu_id)
                             labels = send_to_device(labels, gpu_id)
                             sample_weights = send_to_device(sample_weights, gpu_id)
@@ -770,18 +770,18 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 
                 batch = next(DL)
                 
-                ques = b['ques']
-                answers = b['ans']
-                videos = b['videos']
-                audios = b['audios']
-                trs = b['trs']
-                sample_weights = b['sw']
-                labels = b['labels']
+                ques = batch['ques']
+                answers = batch['ans']
+                videos = batch['videos']
+                audios = batch['audios']
+                trs = batch['trs']
+                sample_weights = batch['sw']
+                labels = batch['labels']
                 if gpu_id >= 0:
                     # ques = send_to_device(ques, gpu_id)
                     # answers = send_to_device(answers, gpu_id)
                     videos = send_to_device(videos, gpu_id)
-                    audios = send_to_device(audios, gpu_id)
+                    # audios = send_to_device(audios, gpu_id)
                     # trs = send_to_device(trs, gpu_id)
                     labels = send_to_device(labels, gpu_id)
                     sample_weights = send_to_device(sample_weights, gpu_id)
