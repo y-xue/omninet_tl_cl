@@ -1655,26 +1655,26 @@ class social_iq_dataset(Dataset):
             transcripts = h5py.File(data_dir+'/deployed/SOCIAL_IQ_TRANSCRIPT_RAW_CHUNKS_BERT.csd','r')['SOCIAL_IQ_TRANSCRIPT_RAW_CHUNKS_BERT']['data']
             self.trs_features = {}
             for k in transcripts:
+                if split_dict[k] != split:
+                    continue
                 this_trs = np.array(transcripts[k]['features'][:,-768:])
                 if this_trs.sum() == 0:
                     trs_feature_0_ks.append(k)
                     continue
                 this_trs = np.concatenate([this_trs,np.zeros([25,768])],axis=0)[:25,:]
-                self.trs_features[k] = this_trs
+                self.trs_features[k] = np.array(this_trs,dtype='float32')
         
         for d in qa.values():
-            if d['video_name'] == 'deKPBy_uLkg_trimmed-out' or (
-                split_dict[d['video_name']] != split) or (
-                    d['video_name'][:11] in trs_feature_0_ks):
+            vname = d['video_name'][:11] # remove suffix such as  '_trimmed-out'
+
+            if vname == 'deKPBy_uLkg' or split_dict[vname] != split or vname in trs_feature_0_ks:
                 # deKPBy_uLkg_trimmed-out is too short
                 continue
 
             self.ques.append(d['question'])
             self.ans.append(d['answer'])
             self.labels.append(d['label'])
-
-            vname = d['video_name']
-            self.vnames.append(vname[:11]) # remove suffix such as  '_trimmed-out'
+            self.vnames.append(vname)
 
             if 'V' in seq:
                 self.fnames.append(os.path.join(data_dir, 'train', video_folder, vname))
@@ -1683,12 +1683,12 @@ class social_iq_dataset(Dataset):
             audios = h5py.File(data_dir+'/deployed/SOCIAL_IQ_COVAREP.csd','r')['SOCIAL_IQ_COVAREP']['data']
             self.audio_features = {}
             for k in audios:
-                if k in trs_feature_0_ks:
+                if k in trs_feature_0_ks or split_dict[k] != split:
                     continue
                 this_audio = np.array(audios[k]['features'])
                 this_audio = np.nan_to_num(this_audio)
                 this_audio = np.concatenate([this_audio,np.zeros([25,74])],axis=0)[:25,:]
-                self.audio_features[k] = this_audio
+                self.audio_features[k] = np.array(this_audio,dtype='float32')
             
     def __len__(self):
         return len(self.ques)
@@ -1697,11 +1697,9 @@ class social_iq_dataset(Dataset):
         audio, trs, video = None, None, None
         k = self.vnames[index]
         if 'A' in self.seq:
-            audio = torch.from_numpy(self.audio_features[k]).float()
+            audio = torch.from_numpy(self.audio_features[k])
         if 'T' in self.seq:
-            trs = torch.from_numpy(self.trs_features[k]).float()
-            if trs.sum() == 0:
-                trs = None
+            trs = torch.from_numpy(self.trs_features[k])
         if 'V' in self.seq:
             buffer = self.load_frames(self.fnames[index])
             buffer = self.crop(buffer, self.clip_len, self.crop_size)

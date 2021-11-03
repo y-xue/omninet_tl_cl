@@ -15,7 +15,7 @@ def split(vdir, odir):
             if f == 'deKPBy_uLkg_trimmed-out.mp4':
                 continue
 
-            video_names.append(f.split('.')[0])
+            video_names.append(f[:11])#(f.split('.')[0])
     val_size = test_size = 100
 
     np.random.shuffle(video_names)
