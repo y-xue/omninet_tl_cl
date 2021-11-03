@@ -1650,12 +1650,12 @@ class social_iq_dataset(Dataset):
         with open(os.path.join(data_dir,'train/qa.dict.pkl'), 'rb') as f:
             qa = pickle.load(f)
 
-        trs_feature_0_ks = []
+        trs_feature_0_ks = ['deKPBy_uLkg'] # deKPBy_uLkg_trimmed-out is too short
         if 'T' in seq:
             transcripts = h5py.File(data_dir+'/deployed/SOCIAL_IQ_TRANSCRIPT_RAW_CHUNKS_BERT.csd','r')['SOCIAL_IQ_TRANSCRIPT_RAW_CHUNKS_BERT']['data']
             self.trs_features = {}
             for k in transcripts:
-                if split_dict[k] != split:
+                if k in trs_feature_0_ks or split_dict[k] != split:
                     continue
                 this_trs = np.array(transcripts[k]['features'][:,-768:])
                 if this_trs.sum() == 0:
@@ -1667,8 +1667,7 @@ class social_iq_dataset(Dataset):
         for d in qa.values():
             vname = d['video_name'][:11] # remove suffix such as  '_trimmed-out'
 
-            if vname == 'deKPBy_uLkg' or split_dict[vname] != split or vname in trs_feature_0_ks:
-                # deKPBy_uLkg_trimmed-out is too short
+            if vname in trs_feature_0_ks or split_dict[vname] != split:
                 continue
 
             self.ques.append(d['question'])
