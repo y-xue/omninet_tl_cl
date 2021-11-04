@@ -43,3 +43,20 @@ def reward_ITTIV(seq, acc, count=True):
 def reward_ITTIV_t(seq, acc, count=True):
     return reward_fun(coef_ITTIV2[seq], acc)
 
+
+siq_seq_lst = ['Q', 'QA', 'QAT', 'QATV']
+siq_coef_lst = [0.7**i for i in range(4)]
+siq_coef = dict(zip(siq_seq_lst, siq_coef_lst))
+
+def siq_reward_fun(a,x):
+    return a*x**8
+
+def reward_SIQ(seq, acc):
+    return siq_reward_fun(siq_coef[seq], acc)
+
+def siq_reward_fun_linear(a,x):
+    return a*x
+
+def reward_SIQ_linear(seq, acc):
+    return siq_reward_fun_linear(siq_coef[seq], acc)
+
