@@ -1650,24 +1650,40 @@ class social_iq_dataset(Dataset):
         with open(os.path.join(data_dir,'train/qa.dict.pkl'), 'rb') as f:
             qa = pickle.load(f)
 
-        trs_feature_0_ks = ['deKPBy_uLkg'] # deKPBy_uLkg_trimmed-out is too short
+        feature_0_ks = set(['deKPBy_uLkg']) # deKPBy_uLkg_trimmed-out is too short
+        feature_0_ks.update(['9m0d0RaWpfY', 'IHU9Jc_NUuk']) # audio feature 0 keys
         if 'T' in seq:
             transcripts = h5py.File(data_dir+'/deployed/SOCIAL_IQ_TRANSCRIPT_RAW_CHUNKS_BERT.csd','r')['SOCIAL_IQ_TRANSCRIPT_RAW_CHUNKS_BERT']['data']
             self.trs_features = {}
             for k in transcripts:
-                if k in trs_feature_0_ks or split_dict[k] != split:
+                if k in feature_0_ks or split_dict[k] != split:
                     continue
                 this_trs = np.array(transcripts[k]['features'][:,-768:])
                 if this_trs.sum() == 0:
-                    trs_feature_0_ks.append(k)
+                    feature_0_ks.add(k)
                     continue
                 this_trs = np.concatenate([this_trs,np.zeros([25,768])],axis=0)[:25,:]
                 self.trs_features[k] = np.array(this_trs,dtype='float32')
         
+        if 'A' in seq:
+            audios = h5py.File(data_dir+'/deployed/SOCIAL_IQ_COVAREP.csd','r')['SOCIAL_IQ_COVAREP']['data']
+            self.audio_features = {}
+            for k in audios:
+                if k in feature_0_ks or split_dict[k] != split:
+                    continue
+
+                this_audio = np.array(audios[k]['features'])
+                this_audio = (this_audio - np.nanmean(this_audio, axis=0))/np.nanstd(this_audio, axis=0)
+                this_audio = np.nan_to_num(this_audio)
+                this_audio = np.concatenate([this_audio,np.zeros([25,74])],axis=0)[:25,:]
+                if this_audio.sum() == 0:
+                    raise Exception('AUDIO features are all 0')
+                self.audio_features[k] = np.array(this_audio,dtype='float32')
+            
         for d in qa.values():
             vname = d['video_name'][:11] # remove suffix such as  '_trimmed-out'
 
-            if vname in trs_feature_0_ks or split_dict[vname] != split:
+            if vname in feature_0_ks or split_dict[vname] != split:
                 continue
 
             self.ques.append(d['question'])
@@ -1676,18 +1692,7 @@ class social_iq_dataset(Dataset):
             self.vnames.append(vname)
 
             if 'V' in seq:
-                self.fnames.append(os.path.join(data_dir, 'train', video_folder, vname))
-            
-        if 'A' in seq:
-            audios = h5py.File(data_dir+'/deployed/SOCIAL_IQ_COVAREP.csd','r')['SOCIAL_IQ_COVAREP']['data']
-            self.audio_features = {}
-            for k in audios:
-                if k in trs_feature_0_ks or split_dict[k] != split:
-                    continue
-                this_audio = np.array(audios[k]['features'])
-                this_audio = np.nan_to_num(this_audio)
-                this_audio = np.concatenate([this_audio,np.zeros([25,74])],axis=0)[:25,:]
-                self.audio_features[k] = np.array(this_audio,dtype='float32')
+                self.fnames.append(os.path.join(data_dir, 'train', video_folder, d['video_name']))
             
     def __len__(self):
         return len(self.ques)
