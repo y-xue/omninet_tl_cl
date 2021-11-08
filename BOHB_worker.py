@@ -12,21 +12,33 @@ import random
 
 class MyWorker(Worker):
 
-    def __init__(self, *args, seed=1029, out_path='mm_random_seq_dropout_0.5_0.25_allseed219', gpu_id=0, xi=0.01, lr=0.01, n_warmup_steps=5000, large_seq_rewarding=False, restore_last=True, **kwargs):
+    def __init__(self, *args, seed=1029, move_out='/files/yxue/research/allstate/out',
+        out_path='mm_random_seq_dropout_0.5_0.25_allseed219', 
+        data_path='/files/yxue/research/allstate/data/synthetic_mm_cifar_imdb_hmdb',
+        seq='ITTIV', task='mm_ITV', 
+        save_intvl=500, eval_intvl=500, batch_size=16, val_batch_size=None,
+        gpu_id=0, xi=0.01, lr=0.01, n_warmup_steps=5000, 
+        sample_idx_fn='sample_idx_ITTIV_pT.7_no_dup_all_img_text_video_seed10',
+        peripherals_type='timeline', conf_type='timeline',
+        large_seq_rewarding=False, restore_last=True, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.xi = xi
-        self.save_intvl=500
-        self.eval_intvl=500
-        self.lr=lr
-        self.bs=16
+        self.save_intvl = save_intvl
+        self.eval_intvl = eval_intvl
+        self.lr = lr
+        self.bs = batch_size
+        self.val_batch_size = val_batch_size
         # self.n_iter=4005
-        self.seq='ITTIV'
-        self.task='mm_ITV'
-        self.n_gpus=1
-        self.all_seed=seed #(1029 47 816 21 219 222 628 845 17 531 635)
-        self.n_warmup_steps=n_warmup_steps
+        self.seq = seq
+        self.task = task
+        self.n_gpus = 1
+        self.all_seed = seed #(1029 47 816 21 219 222 628 845 17 531 635)
+        self.n_warmup_steps = n_warmup_steps
+        self.peripherals_type = peripherals_type
+        self.conf_type = conf_type
         self.restore_last = restore_last
+        self.sample_idx_fn = sample_idx_fn
         self.large_seq_rewarding = large_seq_rewarding
         self.overfitting_threshold = 0.0001
         self.start_detect_overfitting_iter = 1000
@@ -35,9 +47,9 @@ class MyWorker(Worker):
 
         # self.move_out='/Users/ye/Documents/research/allstate/out'
         # self.data_path='/Users/ye/Documents/research/allstate/data/synthetic_mm_cifar_imdb_hmdb'
-        self.move_out='/files/yxue/research/allstate/out'
-        self.data_path='/files/yxue/research/allstate/data/synthetic_mm_cifar_imdb_hmdb'
-        self.bo_iter_output_path='mm_bo/'+ self.out_path + '/%s_%sbs'
+        self.move_out = move_out
+        self.data_path = data_path
+        self.bo_iter_output_path = 'mm_bo/'+ self.out_path + '/%s_%sbs'
         
         self.bo_iter = 0
         self.best_bo_iter = 0
@@ -144,13 +156,13 @@ class MyWorker(Worker):
             '--move_out_path',
             move_out_path,
             '--sample_idx_fn', 
-            'sample_idx_ITTIV_pT.7_no_dup_all_img_text_video_seed10', 
+            '%s'%self.sample_idx_fn, 
             '--sample_weights_fn',
             fn,
             '--peripherals_type',
-            'timeline',
+            '%s'%self.peripherals_type,
             '--conf_type',
-            'timeline',
+            '%s'%self.conf_type,
             '--all_seed',
             '%s'%self.all_seed,
             '--rewarding',
@@ -159,6 +171,9 @@ class MyWorker(Worker):
 
         if self.restore_last:
             training_cmd.append('--restore_last')
+
+        if self.val_batch_size is not None:
+            training_cmd.extend(['--val_batch_size', '%s'%self.val_batch_size])
 
         if self.large_seq_rewarding:
             training_cmd.append('--large_seq_rewarding')
@@ -253,7 +268,7 @@ class MyWorker(Worker):
             print('config:', config, file=f)
 
         self.bo_iter = '-'.join([str(x) for x in config_id])
-        X_next = np.array([config['w1'],config['w2'],config['w3'],config['w4'],config['w5']])
+        X_next = np.array(list(config.values()))
         val_reward, test_reward = self.total_val_reward(X_next)
         res = -1*val_reward
         # if self.n_iter > 4000:
@@ -285,7 +300,7 @@ class MyWorker(Worker):
                 })
 
     @staticmethod
-    def get_configspace(seed):
+    def get_configspace(seed, task='mm_ITV'):
         # random.seed(seed)
         # np.random.seed(seed)
         # os.environ['PYTHONHASHSEED'] = str(seed)
@@ -295,5 +310,11 @@ class MyWorker(Worker):
         config_space.add_hyperparameter(CS.UniformFloatHyperparameter('w2', lower=0, upper=1))
         config_space.add_hyperparameter(CS.UniformFloatHyperparameter('w3', lower=0, upper=1))
         config_space.add_hyperparameter(CS.UniformFloatHyperparameter('w4', lower=0, upper=1))
-        config_space.add_hyperparameter(CS.UniformFloatHyperparameter('w5', lower=0, upper=1))
+        if task in ['mm_ITV','bdd']:
+            config_space.add_hyperparameter(CS.UniformFloatHyperparameter('w5', lower=0, upper=1))
+        if task == 'bdd':
+            config_space.add_hyperparameter(CS.UniformFloatHyperparameter('w6', lower=0, upper=1))
+            config_space.add_hyperparameter(CS.UniformFloatHyperparameter('w7', lower=0, upper=1))
+            config_space.add_hyperparameter(CS.UniformFloatHyperparameter('w8', lower=0, upper=1))
+    
         return(config_space)

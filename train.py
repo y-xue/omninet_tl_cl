@@ -52,6 +52,7 @@ parser = argparse.ArgumentParser(description='OmniNet training script.')
 parser.add_argument('n_iters', help='Number of iterations to train.')
 parser.add_argument('tasks', help='List of tasks seperated by comma.')
 parser.add_argument('batch_sizes', help='List of batch size for each task seperated by comma')
+parser.add_argument('--val_batch_size', default=None, type=int, help='validation batch size')
 parser.add_argument('--n_jobs', default=1, help='Number of asynchronous jobs to run for each task.')
 parser.add_argument('--n_gpus', default=1, help='Number of GPUs to use')
 parser.add_argument('--n_workers', default=0, type=int, help='Number of workers to load data')
@@ -354,7 +355,11 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
         else:
             predefined_sample_weights = None
 
-        dl_lst, val_dl_lst, test_dl_lst = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=n_workers, batch_size=batch_size, clip_len=16, data_seed=args.data_seed)
+        if args.val_batch_size is None:
+            val_batch_size = int(batch_size/2)
+        else:
+            val_batch_size = int(args.val_batch_size)
+        dl_lst, val_dl_lst, test_dl_lst = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=n_workers, batch_size=batch_size, val_batch_size=val_batch_size, clip_len=16, data_seed=args.data_seed)
         DLS = [iter(cycle(tr_dl)) for tr_dl in dl_lst]
         dl_ids = iter(cycle(range(len(dl_lst))))
 
@@ -650,8 +655,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                         total_reward_linear += val_reward_linear
                         
                     # summary_writer.add_scalar('Test_loss_%s'%seq, val_loss, step)
-                    print('Step %d, %s, SIQ test loss: %f, Accuracy %f %%, reward: %f' % (step, seq, val_loss, val_acc, val_reward))
-                    log_str += 'Step %d, %s, SIQ test loss: %f, Accuracy %f %%, reward: %f\n' % (step, seq, val_loss, val_acc, val_reward)
+                    print('Step %d, %s, SIQ test loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f' % (step, seq, val_loss, val_acc, val_reward, val_reward_linear))
+                    log_str += 'Step %d, %s, SIQ test loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f\n' % (step, seq, val_loss, val_acc, val_reward, val_reward_linear)
 
                 print('-' * 100)
                 log_str += '-' * 100 + '\n'
@@ -715,8 +720,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                         total_reward_linear += val_reward_linear
                         
                     # summary_writer.add_scalar('Val_loss_%s'%seq, val_loss, step)
-                    print('Step %d, %s, SIQ validation loss: %f, Accuracy %f %%, reward: %f' % (step, seq, val_loss,val_acc*100,val_reward))
-                    log_str += 'Step %d, %s, SIQ validation loss: %f, Accuracy %f %%, reward: %f\n' % (step, seq, val_loss,val_acc*100,val_reward)
+                    print('Step %d, %s, SIQ validation loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f' % (step, seq, val_loss,val_acc*100,val_reward,val_reward_linear))
+                    log_str += 'Step %d, %s, SIQ validation loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f\n' % (step, seq, val_loss,val_acc*100,val_reward,val_reward_linear)
                     end_time = time.time()
                     print('Step {}, {}, validation takes {:.2f}s\n'.format(step, seq, end_time - start_time))
                     log_str += 'Step {}, {}, validation takes {:.2f}s\n'.format(step, seq, end_time - start_time)

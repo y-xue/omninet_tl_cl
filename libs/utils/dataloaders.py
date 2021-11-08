@@ -1778,7 +1778,7 @@ class social_iq_dataset(Dataset):
         return buffer
 
 
-def social_iq_batchgen(data_dir, video_folder, full_seq, sample_weights, seq_lst=None, num_workers=1, batch_size=1, structured_path=None, clip_len=30, data_seed=68):
+def social_iq_batchgen(data_dir, video_folder, full_seq, sample_weights, seq_lst=None, num_workers=1, batch_size=1, val_batch_size=1, structured_path=None, clip_len=30, data_seed=68):
     random.seed(data_seed)
     np.random.seed(data_seed)
     torch.manual_seed(data_seed)
@@ -1798,11 +1798,11 @@ def social_iq_batchgen(data_dir, video_folder, full_seq, sample_weights, seq_lst
         print('# of training mini-batches:', len(dataloader))
         dl_lst.append(dataloader)
         val_dataset = social_iq_dataset(seq, sample_weights, data_dir, video_folder, split_dict, split='val', clip_len=clip_len)
-        val_dl_lst.append(DataLoader(val_dataset, num_workers=num_workers, batch_size=max(int(batch_size/2),1), shuffle=True,
+        val_dl_lst.append(DataLoader(val_dataset, num_workers=num_workers, batch_size=max(val_batch_size,1), shuffle=True,
                                      collate_fn=social_iq_collate_fn, drop_last=False))
         
         test_dataset = social_iq_dataset(seq, sample_weights, data_dir, video_folder, split_dict, split='test', clip_len=clip_len)
-        test_dl_lst.append(DataLoader(test_dataset, num_workers=0, batch_size=max(int(batch_size/2),1), shuffle=True,
+        test_dl_lst.append(DataLoader(test_dataset, num_workers=0, batch_size=max(val_batch_size,1), shuffle=True,
                                      collate_fn=social_iq_collate_fn, drop_last=False))
     
     return dl_lst, val_dl_lst, test_dl_lst
