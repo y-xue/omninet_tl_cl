@@ -80,7 +80,7 @@ print('worker running')
 # Now we can create an optimizer object and start the run.
 # Here, we run BOHB, but that is not essential.
 # The run method will return the `Result` that contains all runs performed.
-bohb = BOHB(  configspace = w.get_configspace(args.seed), min_points_in_model=args.n_random_init,
+bohb = BOHB(  configspace = w.get_configspace(args.seed,args.task), min_points_in_model=args.n_random_init,
               run_id = str(args.seed), nameserver='127.0.0.1',nameserver_port=args.port,
               min_budget=args.min_budget, max_budget=args.max_budget
            )

@@ -83,15 +83,15 @@ class OmniNet(nn.Module):
             self.audio_perph = FeaturePeripheral(74,cc['input_dim'],gpu_id=gpu_id)
             self.trs_perph = FeaturePeripheral(768,cc['input_dim'],gpu_id=gpu_id)
             self.video_input_perph = None
-            self.struct_spat_perph = StructuredSpatialPeripheral(output_dim=cc['input_dim'],dropout=pc['struct_spat_dropout'],
-                                            unstructured_as_structured=unstructured_as_structured,
-                                            freeze_layers=not pc['unfreeze']['struct_spat'])
-            self.struct_temp_perph = StructuredTemporalPeripheral(output_dim=cc['input_dim'],dropout=pc['struct_temp_dropout'],
-                                            unstructured_as_structured=unstructured_as_structured,
-                                            freeze_layers=not pc['unfreeze']['struct_temp'])
-            self.struct_perph = StructuredPeripheral(output_dim=cc['logit_struct_periph_dim'],dropout=pc['struct_dropout'],
-                                            unstructured_as_structured=unstructured_as_structured,
-                                            freeze_layers=not pc['unfreeze']['struct_logits'])
+            # self.struct_spat_perph = StructuredSpatialPeripheral(output_dim=cc['input_dim'],dropout=pc['struct_spat_dropout'],
+            #                                 unstructured_as_structured=unstructured_as_structured,
+            #                                 freeze_layers=not pc['unfreeze']['struct_spat'])
+            # self.struct_temp_perph = StructuredTemporalPeripheral(output_dim=cc['input_dim'],dropout=pc['struct_temp_dropout'],
+            #                                 unstructured_as_structured=unstructured_as_structured,
+            #                                 freeze_layers=not pc['unfreeze']['struct_temp'])
+            # self.struct_perph = StructuredPeripheral(output_dim=cc['logit_struct_periph_dim'],dropout=pc['struct_dropout'],
+            #                                 unstructured_as_structured=unstructured_as_structured,
+            #                                 freeze_layers=not pc['unfreeze']['struct_logits'])
         else:
             print('using timeline peripherals')
 
