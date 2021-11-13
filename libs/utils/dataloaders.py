@@ -1782,6 +1782,8 @@ def social_iq_batchgen(data_dir, video_folder, full_seq, sample_weights, seq_lst
     random.seed(data_seed)
     np.random.seed(data_seed)
     torch.manual_seed(data_seed)
+    if val_batch_size is None:
+        val_batch_size = batch_size // 2
 
     with open(os.path.join(data_dir, 'train/split_with_test.dict.pkl'), 'rb') as f:
         split_dict = pickle.load(f)

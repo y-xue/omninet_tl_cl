@@ -43,6 +43,7 @@ from tqdm import tqdm
 from libs.utils.train_util import *
 import json
 import shutil
+import re
 
 from omninet_config import *
 from libs.utils.reward_func import *
@@ -132,6 +133,8 @@ hmdb_data_dir = data_path
 hmdb_process_dir = os.path.join(data_path, 'hmdbprocess')
 # penn_data_dir = os.path.join(data_path, 'penn')
 bdd_dir = os.path.join(data_path, 'bdd_v1')
+socialiq_dir = os.path.join(data_path, 'socialiq')
+socialiq_video_folder = 'vision/videos_1fps_640-360_resized'
 
 
 mm_image_dir = data_path
@@ -182,7 +185,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 		  random_seq=False, notest=False, test=False, test_on_val=False,
 		  use_sgd=False,
 		  task_id=0, task_category_id=0, ewc_lambda=0, n_warmup_steps=3000, 
-		  full_seq='ITTIV',counting_reward_dict=None,pass_idx=None):
+		  full_seq='ITTIV',test_reward_dict=None,pass_idx=None):
 	log_dir = 'logs/%s' % task
 	if not os.path.exists(log_dir):
 		os.makedirs(log_dir)
@@ -230,7 +233,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 
 		predefined_sample_weights = dict(zip([str(x) for x in range(1,5)], [1.]*4))
 
-		dl_lst, val_dl_lst, test_dl_lst = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=n_workers, batch_size=batch_size, val_batch_size=val_batch_size, clip_len=16, data_seed=args.data_seed)
+		dl_lst, val_dl_lst, test_dl_lst = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=n_workers, batch_size=batch_size, val_batch_size=args.val_batch_size, clip_len=16, data_seed=args.data_seed)
 		DLS = [iter(cycle(tr_dl)) for tr_dl in dl_lst]
 		dl_ids = iter(cycle(range(len(dl_lst))))
 
@@ -238,7 +241,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 			Adam(
 				filter(lambda x: x.requires_grad, shared_model.parameters()),
 				betas=(0.9, 0.98), eps=1e-09),
-			512, args.n_warmup_steps,restore,max_lr=0.0001,init_lr=args.init_lr)
+			512, n_warmup_steps,restore,max_lr=0.0001,init_lr=args.init_lr)
 
 	if task == 'bdd':
 		full_seq = 'GGGVGVVV'
@@ -345,10 +348,10 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 		if task == 'socialiq':
 			if not notest and i+1 >= train_steps:
 				if save_best:
-					shared_model.restore(move_out_path, 'best/0')
+					shared_model.restore(model_save_path, 'best/0')
 					log_str += 'Restored existing best model\n'
 				else:
-					shared_model.restore(move_out_path, best_iteration)
+					shared_model.restore(model_save_path, best_iteration)
 					log_str += 'Restored existing model with iterations: %d\n' % (best_iteration)
 
 				model = shared_model
@@ -425,7 +428,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 					for seq in test_reward_dict:
 						n_correct, n_total, _ = test_reward_dict[seq]
 						acc = n_correct / n_total
-						test_reward_dict[seq][2] = reward_bdd(seq, acc)
+						test_reward_dict[seq][2] = reward_SIQ(seq, acc)
 						print('Step %d, %s, SIQ test Accuracy %f %%, reward: %f (%d/%d)'%(step, seq,acc*100,test_reward_dict[seq][2],n_correct,n_total))
 						log_str += 'Step %d, %s, SIQ test Accuracy %f %%, reward: %f (%d/%d)\n'%(step, seq,acc*100,test_reward_dict[seq][2],n_correct,n_total)
 
@@ -509,21 +512,21 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 
 				validation_score_history.append(total_reward)
 
-				if rewarding and total_reward > best_val_reward:
-					best_val_reward = total_reward
+				if rewarding and total_reward > best_val_score:
+					best_val_score = total_reward
 					best_iteration = step-1
 					print(best_iteration)
 					log_str += 'best_iteration:{}\n'.format(best_iteration)
 
 					if save_best:
-						shared_model.save(move_out_path, 'best/0')
+						shared_model.save(model_save_path, 'best/0')
 						if args.restore_opt:
-							optimizer.save(move_out_path, 'best/0')
+							optimizer.save(args.model_save_path, 'best/0')
 
 				print('Step %d, SIQ total validation Accuracy %f %%, reward: %f, reward_linear: %f'%(step, total_val_acc, total_reward, total_reward_linear))
 				log_str += 'Step %d, SIQ total validation Accuracy %f %%, reward: %f, reward_linear: %f\n'%(step, total_val_acc, total_reward, total_reward_linear)
 
-				with open(move_out_path + '.log', 'a') as f: #open(os.path.join(model_save_path, 'log.txt'), 'a') as f:
+				with open(model_save_path + '.log', 'a') as f: #open(os.path.join(model_save_path, 'log.txt'), 'a') as f:
 					print(log_str, file=f)
 					log_str = ''
 
@@ -531,17 +534,17 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 			
 				eval_step = i // eval_interval
 
-				if eval_step >= converge_window:
-					prev_max_val_score = max(prev_max_val_score, validation_score_history[int(eval_step-converge_window)])
+				if eval_step >= args.converge_window:
+					prev_max_val_score = max(prev_max_val_score, validation_score_history[int(eval_step-args.converge_window)])
 
-					if curr_max_val_score <= prev_max_val_score and eval_step >= safe_window:
+					if curr_max_val_score <= prev_max_val_score and eval_step >= args.safe_window:
 						break
 
 				model = model.train()
 				continue
 
 			if not test:
-				next_dl_id = np.random.choice(range(len(full_seq)))
+				next_dl_id = np.random.choice(range(len(DLS)))
 				DL = DLS[next_dl_id]
 				seq = seq_lst[next_dl_id]
 
@@ -973,27 +976,27 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 						val_reward_t = reward_ITTIV_t(seq, val_acc/100, count=False)
 						total_reward_t += val_reward_t
 
-					if counting_reward_dict is not None:
+					if test_reward_dict is not None:
 						seqc = '%s-%s-%s'%(seq.count('I'), seq.count('T'), seq.count('V'))
-						if seqc in counting_reward_dict:
-							counting_reward_dict[seqc][0] += val_correct
-							counting_reward_dict[seqc][1] += val_total
+						if seqc in test_reward_dict:
+							test_reward_dict[seqc][0] += val_correct
+							test_reward_dict[seqc][1] += val_total
 						else:
-							counting_reward_dict[seqc] = [val_correct,val_total,0]
+							test_reward_dict[seqc] = [val_correct,val_total,0]
 						
 					summary_writer.add_scalar('Test_loss_%s'%seq, val_loss, step)
 					print('Step %d, %s, mm test loss: %f, Accuracy %f %%, reward: %f, reward_t: %f (%d/%d)' % (step, seq, val_loss, val_acc, val_reward, val_reward_t, val_correct, val_total))
 					log_str += 'Step %d, %s, mm test loss: %f, Accuracy %f %%, reward: %f, reward_t: %f (%d/%d)\n' % (step, seq, val_loss, val_acc, val_reward, val_reward_t, val_correct, val_total)
 
-				if counting_reward_dict is not None:
+				if test_reward_dict is not None:
 					print('-' * 100)
 					log_str += '-' * 100 + '\n'
-					for seqc in counting_reward_dict:
-						n_correct, n_total, _ = counting_reward_dict[seqc]
+					for seqc in test_reward_dict:
+						n_correct, n_total, _ = test_reward_dict[seqc]
 						acc = n_correct/n_total
-						counting_reward_dict[seqc][2] = reward_ITTIV(seqc, acc, count=True)
-						print('Step %d, %s, mm test Accuracy %f %%, reward: %f (%d/%d)' % (step, seqc,acc*100,counting_reward_dict[seqc][2],n_correct,n_total))
-						log_str += 'Step %d, %s, mm test Accuracy %f %%, reward: %f (%d/%d)\n' % (step, seqc,acc*100,counting_reward_dict[seqc][2],n_correct,n_total)
+						test_reward_dict[seqc][2] = reward_ITTIV(seqc, acc, count=True)
+						print('Step %d, %s, mm test Accuracy %f %%, reward: %f (%d/%d)' % (step, seqc,acc*100,test_reward_dict[seqc][2],n_correct,n_total))
+						log_str += 'Step %d, %s, mm test Accuracy %f %%, reward: %f (%d/%d)\n' % (step, seqc,acc*100,test_reward_dict[seqc][2],n_correct,n_total)
 
 				print('-' * 100)
 				log_str += '-' * 100 + '\n'
@@ -1001,8 +1004,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 				print('Step %d, mm total test Accuracy %f %%, reward: %f, reward_t: %f (%d/%d)'%(step, total_val_acc, total_reward, total_reward_t, total_correct, total))
 				log_str += 'Step %d, mm total test Accuracy %f %%, reward: %f, reward_t: %f (%d/%d)\n'%(step, total_val_acc, total_reward, total_reward_t, total_correct, total)
 
-				if counting_reward_dict is not None:
-					total_counting_reward = sum([v[2] for _,v in counting_reward_dict.items()])
+				if test_reward_dict is not None:
+					total_counting_reward = sum([v[2] for _,v in test_reward_dict.items()])
 					print('Step %d, mm total test reward: %f'%(step, total_counting_reward))
 					log_str += 'Step %d, mm total test reward: %f\n'%(step, total_counting_reward)
 
@@ -1356,9 +1359,14 @@ def on_task_update(model, task, task_id, seq_lst, batch_size, gpu_id):
 			num_workers=args.n_workers, batch_size=batch_size,
 			seq_count=False, drop_last_tr=False, data_seed=args.data_seed)
 	elif task == 'bdd':
-		dl_lst, _, _ = dl.bdd_batchgen(bdd_dir, args.full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=args.n_workers, batch_size=batch_size, data_seed=args.data_seed, large_val=args.large_val)
+		dl_lst, _, _ = dl.bdd_batchgen(bdd_dir, args.full_seq, predefined_sample_weights, 
+			seq_lst=seq_lst, num_workers=args.n_workers, batch_size=batch_size, 
+			data_seed=args.data_seed, large_val=args.large_val)
 	elif task == 'socialiq':
-		dl_lst, _, _ = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, args.full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=n_workers, batch_size=batch_size, val_batch_size=args.val_batch_size, clip_len=16, data_seed=args.data_seed)
+		dl_lst, _, _ = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, 
+			args.full_seq, predefined_sample_weights, seq_lst=seq_lst, 
+			num_workers=args.n_workers, batch_size=batch_size, 
+			val_batch_size=args.val_batch_size, clip_len=16, data_seed=args.data_seed)
 
 	seq_sizes = [len(dataset) for dataset in dl_lst]
 	dl_idx = []
@@ -1566,9 +1574,9 @@ if __name__ == '__main__':
 		cl_tasks = [[args.full_seq[:i]] for i in range(1,len(args.full_seq)+1)]
 		print('cl_tasks:', cl_tasks)
 		# n_iters_lst = [10005]*8 #, 10005, 10005, 10005, 10005]
-		n_iters_lst = [10005, 5005, 10005, 20005]
-		eval_interval_lst = [3899]*4
-		save_interval_lst = [3899]*4
+		n_iters_lst = [1075, 1075, 885, 885]
+		eval_interval_lst = [1072,1072,879,879]
+		save_interval_lst = [1072,1072,879,879]
 
 	if len(args.ewc_lambda) == 1:
 		ewc_lambda = args.ewc_lambda * len(args.full_seq)
@@ -1640,7 +1648,7 @@ if __name__ == '__main__':
 			for test, test_on_val in [(True, True), (True, False)]:
 				# test = True
 				notest = False
-				counting_reward_dict = {}
+				test_reward_dict = {}
 
 				# if k == 0:
 				# 	test_tasks = cl_tasks[:(task_category_id+1)]
@@ -1669,7 +1677,7 @@ if __name__ == '__main__':
 							 ewc_lambda[task_category_id]*ewc_scales[k]*(task_id+1>args.n_ewc_warmup), 
 							 n_warmup_steps[task_category_id],
 							 args.full_seq,
-							 counting_reward_dict, None)
+							 test_reward_dict, None)
 
 			with open(args.model_save_path + '/current_iterations.pkl', 'wb') as f:
 				pickle.dump(current_iterations, f)

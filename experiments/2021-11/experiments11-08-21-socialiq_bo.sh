@@ -17,9 +17,13 @@ run_bo(){
 	--batch_size 16 --val_batch_size 4 \
 	--peripherals_type='default' --conf_type='default' \
 	--seed ${seed} --n_iterations 20 \
-	--min_budget 15000 --max_budget 50000 \
+	--min_budget 15000 --max_budget 45000 \
 	--lr ${lr} --n_warmup_steps ${warmup} < /dev/null > ${odir}/${opath}.nohup.log 2> ${odir}/${opath}.err;
 
 }
 
-run_bo 21 0 0.005 16000 9500 1
+run_bo 1029 0 0.005 16000 9500 1 &
+run_bo 816 1 0.005 16000 9600 30 &
+run_bo 47 2 0.005 16000 9700 60 &
+run_bo 21 3 0.005 16000 9800 90;
+
