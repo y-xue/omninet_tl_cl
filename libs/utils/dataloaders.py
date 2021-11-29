@@ -1796,7 +1796,7 @@ def social_iq_batchgen(data_dir, video_folder, full_seq, sample_weights, seq_lst
     for seq in seq_lst:
         dataset = social_iq_dataset(seq, sample_weights, data_dir, video_folder, split_dict, split='train', clip_len=clip_len)
         dataloader = DataLoader(dataset, num_workers=num_workers, batch_size=batch_size, shuffle=True,
-                                     collate_fn=social_iq_collate_fn, drop_last=True,pin_memory=True)
+                                     collate_fn=social_iq_collate_fn, drop_last=True,pin_memory=False)
         print('# of training mini-batches:', len(dataloader))
         dl_lst.append(dataloader)
         val_dataset = social_iq_dataset(seq, sample_weights, data_dir, video_folder, split_dict, split='val', clip_len=clip_len)

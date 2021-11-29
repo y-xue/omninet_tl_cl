@@ -81,6 +81,7 @@ parser.add_argument('--test_on_val', action='store_true', help='True if only tes
 parser.add_argument('--use_sgd', action='store_true', help='True if use SGD.')
 parser.add_argument('--init_lr', default=0.02, type=float, help='init_lr')
 parser.add_argument('--n_warmup_steps', default=[3000], nargs='+', type=float, help='n_warmup_steps for ScheduledOptim')
+parser.add_argument('--n_subtask_iters', default=None, nargs='+', type=int, help='n_iters for each subtask')
 # parser.add_argument('--ewc_lambda', default=0.4, type=float, help='hyperparameter of EWC')
 parser.add_argument('--ewc_lambda', default=[0.4], nargs='+', type=float, help='hyperparameter of EWC')
 parser.add_argument('--lambda_decay', default=None, type=str, help='lambda decay method')
@@ -184,7 +185,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 		  save_best=False, testing=False, sample_idx_fn=None, seq_lst=None, rewarding=False,
 		  random_seq=False, notest=False, test=False, test_on_val=False,
 		  use_sgd=False,
-		  task_id=0, task_category_id=0, ewc_lambda=0, n_warmup_steps=3000, 
+		  task_id=0, task_category_id=0, ewc_lambda=0, ewc_lambda_dict=None, repeat=0, n_warmup_steps=3000, 
 		  full_seq='ITTIV',test_reward_dict=None,pass_idx=None):
 	log_dir = 'logs/%s' % task
 	if not os.path.exists(log_dir):
@@ -1560,23 +1561,40 @@ if __name__ == '__main__':
 		# save_interval_lst = [500]*5
 
 		# n_iters_lst = [5005, 5005, 5005, 5005, 5005]
-		n_iters_lst = [10005, 10005, 10005, 10005, 10005]
+		if args.n_subtask_iters is None:
+			n_iters_lst = [10005, 10005, 10005, 10005, 10005]
+		else:
+			n_iters_lst = args.n_subtask_iters
 		eval_interval_lst = [100]*5
 		save_interval_lst = [100]*5
 	elif tasks[0] == 'bdd':
 		cl_tasks = [[args.full_seq[:i]] for i in range(1,len(args.full_seq)+1)]
 		print('cl_tasks:', cl_tasks)
 		# n_iters_lst = [10005]*8 #, 10005, 10005, 10005, 10005]
-		n_iters_lst = [20005]*3+[10005]+[20005]+[10005]*3
+		if args.n_subtask_iters is None:
+			n_iters_lst = [20005]*3+[10005]+[20005]+[10005]*3
+		else:
+			n_iters_lst = args.n_subtask_iters
 		eval_interval_lst = [909]*8
 		save_interval_lst = [909]*8
 	elif tasks[0] == 'socialiq':
 		cl_tasks = [[args.full_seq[:i]] for i in range(1,len(args.full_seq)+1)]
 		print('cl_tasks:', cl_tasks)
 		# n_iters_lst = [10005]*8 #, 10005, 10005, 10005, 10005]
-		n_iters_lst = [1075, 1075, 885, 885]
+		if args.n_subtask_iters is None:
+			n_iters_lst = [1072*10+5, 1072*10+5, 879*10+5, 879*10+5]
+		else:
+			n_iters_lst = args.n_subtask_iters
 		eval_interval_lst = [1072,1072,879,879]
 		save_interval_lst = [1072,1072,879,879]
+
+	if args.lambda_decay == None:
+        ewc_lambda_dict = None
+    elif args.lambda_decay in ['exp', 'exp2', 'exp3']:
+        ewc_lambda_dict = dict(zip(range(len(args.full_seq)), [args.ewc_lambda[0] * (args.decay_a ** i) for i in range(len(args.full_seq))]))
+    else:
+        raise Exception('Unknow lambda decay method.')
+    print_log('ewc_lambda_dict: %s'%(str(ewc_lambda_dict)), args.model_save_path + '.log')
 
 	if len(args.ewc_lambda) == 1:
 		ewc_lambda = args.ewc_lambda * len(args.full_seq)
@@ -1631,6 +1649,7 @@ if __name__ == '__main__':
 					 args.use_sgd,
 					 task_id, task_category_id,
 					 ewc_lambda[task_category_id]*ewc_scales[k]*(task_id+1>args.n_ewc_warmup), 
+					 ewc_lambda_dict, k,
 					 n_warmup_steps[task_category_id],
 					 args.full_seq, None, None) #int(args.all_seed)+k) 
 					 # use args.all_seed+k to set a different seed for dataloader in a different pass
@@ -1675,6 +1694,7 @@ if __name__ == '__main__':
 							 task_category_id_test, 
 							 task_category_id,
 							 ewc_lambda[task_category_id]*ewc_scales[k]*(task_id+1>args.n_ewc_warmup), 
+							 ewc_lambda_dict, k,
 							 n_warmup_steps[task_category_id],
 							 args.full_seq,
 							 test_reward_dict, None)
