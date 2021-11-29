@@ -1589,12 +1589,12 @@ if __name__ == '__main__':
 		save_interval_lst = [1072,1072,879,879]
 
 	if args.lambda_decay == None:
-        ewc_lambda_dict = None
-    elif args.lambda_decay in ['exp', 'exp2', 'exp3']:
-        ewc_lambda_dict = dict(zip(range(len(args.full_seq)), [args.ewc_lambda[0] * (args.decay_a ** i) for i in range(len(args.full_seq))]))
-    else:
-        raise Exception('Unknow lambda decay method.')
-    print_log('ewc_lambda_dict: %s'%(str(ewc_lambda_dict)), args.model_save_path + '.log')
+		ewc_lambda_dict = None
+	elif args.lambda_decay in ['exp', 'exp2', 'exp3']:
+		ewc_lambda_dict = dict(zip(range(len(args.full_seq)), [args.ewc_lambda[0] * (args.decay_a ** i) for i in range(len(args.full_seq))]))
+	else:
+		raise Exception('Unknow lambda decay method.')
+	print_log('ewc_lambda_dict: %s'%(str(ewc_lambda_dict)), args.model_save_path + '.log')
 
 	if len(args.ewc_lambda) == 1:
 		ewc_lambda = args.ewc_lambda * len(args.full_seq)
