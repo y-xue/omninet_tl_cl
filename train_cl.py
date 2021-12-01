@@ -186,7 +186,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 		  random_seq=False, notest=False, test=False, test_on_val=False,
 		  use_sgd=False,
 		  task_id=0, task_category_id=0, ewc_lambda=0, ewc_lambda_dict=None, repeat=0, n_warmup_steps=3000, 
-		  full_seq='ITTIV',test_reward_dict=None,pass_idx=None):
+		  full_seq='ITTIV',test_reward_dict=None,pass_idx=None,dl_lst=None,val_dl_lst=None,test_dl_lst=None):
 	log_dir = 'logs/%s' % task
 	if not os.path.exists(log_dir):
 		os.makedirs(log_dir)
@@ -234,7 +234,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 
 		predefined_sample_weights = dict(zip([str(x) for x in range(1,5)], [1.]*4))
 
-		dl_lst, val_dl_lst, test_dl_lst = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=n_workers, batch_size=batch_size, val_batch_size=args.val_batch_size, clip_len=16, data_seed=args.data_seed)
+		if dl_lst is None:
+			dl_lst, val_dl_lst, test_dl_lst = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=n_workers, batch_size=batch_size, val_batch_size=args.val_batch_size, clip_len=16, data_seed=args.data_seed)
 		DLS = [iter(cycle(tr_dl)) for tr_dl in dl_lst]
 		dl_ids = iter(cycle(range(len(dl_lst))))
 
@@ -1343,7 +1344,7 @@ def remove_seq_type(tasks, sample_idx):
 			task.remove(seq)
 	return tasks
 
-def on_task_update(model, task, task_id, seq_lst, batch_size, gpu_id):
+def on_task_update(model, task, task_id, seq_lst, batch_size, dl_lst, gpu_id):
 	model.train()
 	model.zero_grad()
 
@@ -1363,7 +1364,7 @@ def on_task_update(model, task, task_id, seq_lst, batch_size, gpu_id):
 		dl_lst, _, _ = dl.bdd_batchgen(bdd_dir, args.full_seq, predefined_sample_weights, 
 			seq_lst=seq_lst, num_workers=args.n_workers, batch_size=batch_size, 
 			data_seed=args.data_seed, large_val=args.large_val)
-	elif task == 'socialiq':
+	elif task == 'socialiq' and dl_lst is None:
 		dl_lst, _, _ = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, 
 			args.full_seq, predefined_sample_weights, seq_lst=seq_lst, 
 			num_workers=args.n_workers, batch_size=batch_size, 
@@ -1634,6 +1635,14 @@ if __name__ == '__main__':
 					continue
 			if last_model_save_path != '':
 				shared_model.restore(last_model_save_path, 'best/0')
+
+			if tasks[0] == 'socialiq':
+				full_seq = 'QATV'
+				predefined_sample_weights = dict(zip([str(x) for x in range(1,5)], [1.]*4))
+				dl_lst, val_dl_lst, test_dl_lst = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=n_workers, batch_size=batch_size, val_batch_size=args.val_batch_size, clip_len=16, data_seed=args.data_seed)
+			else:
+				dl_lst, val_dl_lst, test_dl_lst = None, None, None
+
 			train(shared_model, tasks[0], batch_sizes[0],
 					 int(n_iters_lst[task_category_id] / n_jobs),
 					 gpu_id, start, restore, counters[0], barrier,
@@ -1651,7 +1660,8 @@ if __name__ == '__main__':
 					 ewc_lambda[task_category_id]*ewc_scales[k]*(task_id+1>args.n_ewc_warmup), 
 					 ewc_lambda_dict, k,
 					 n_warmup_steps[task_category_id],
-					 args.full_seq, None, None) #int(args.all_seed)+k) 
+					 args.full_seq, None, None,
+					 dl_lst, val_dl_lst, test_dl_lst) #int(args.all_seed)+k) 
 					 # use args.all_seed+k to set a different seed for dataloader in a different pass
 					 # set to None for same seed
 
@@ -1660,7 +1670,7 @@ if __name__ == '__main__':
 			
 			print('on_task_update task:', task_id)
 			start_time = time.time()
-			on_task_update(shared_model, tasks[0], task_category_id, seq_lst, batch_sizes[0], gpu_id=0)
+			on_task_update(shared_model, tasks[0], task_category_id, seq_lst, batch_sizes[0], dl_lst, gpu_id=0)
 			print('on_task_update: %.2f'%(time.time() - start_time))
 
 			# test 
@@ -1697,7 +1707,8 @@ if __name__ == '__main__':
 							 ewc_lambda_dict, k,
 							 n_warmup_steps[task_category_id],
 							 args.full_seq,
-							 test_reward_dict, None)
+							 test_reward_dict, None,
+					 		 None, None, None)
 
 			with open(args.model_save_path + '/current_iterations.pkl', 'wb') as f:
 				pickle.dump(current_iterations, f)
