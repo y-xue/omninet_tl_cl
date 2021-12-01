@@ -28,7 +28,7 @@ import glob
 import numpy as np
 import libs.omninet as omninet
 from libs.utils import dataloaders as dl
-from tensorboardX import SummaryWriter
+# from tensorboardX import SummaryWriter
 import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
@@ -191,8 +191,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 	if not os.path.exists(log_dir):
 		os.makedirs(log_dir)
 
-	if (log == True):
-		summary_writer = SummaryWriter(log_dir)
+	# if (log == True):
+	# 	summary_writer = SummaryWriter(log_dir)
 	# Create local model
 	 
 	# torch.manual_seed(int(random.random() * 1000))
@@ -703,7 +703,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 						else:
 							test_reward_dict[seq] = [val_correct, val_total, 0]
 
-					summary_writer.add_scalar('Test_loss_%s'%seq, val_loss, step)
+					# summary_writer.add_scalar('Test_loss_%s'%seq, val_loss, step)
 					print('Step %d, %s, bdd test loss: %f, Accuracy %f %%, reward: %f' % (step, seq, val_loss, val_acc, val_reward))
 					log_str += 'Step %d, %s, bdd test loss: %f, Accuracy %f %%, reward: %f\n' % (step, seq, val_loss, val_acc, val_reward)
 
@@ -882,8 +882,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 
 				loss=loss.detach()
 
-				if log:
-					summary_writer.add_scalar('Loss_%s'%seq, loss, step)
+				# if log:
+				# 	summary_writer.add_scalar('Loss_%s'%seq, loss, step)
 
 				if i == start + 1:
 					fisher_loss_str = ''
@@ -997,7 +997,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 						else:
 							test_reward_dict[seqc] = [val_correct,val_total,0]
 						
-					summary_writer.add_scalar('Test_loss_%s'%seq, val_loss, step)
+					# summary_writer.add_scalar('Test_loss_%s'%seq, val_loss, step)
 					print('Step %d, %s, mm test loss: %f, Accuracy %f %%, reward: %f, reward_t: %f (%d/%d)' % (step, seq, val_loss, val_acc, val_reward, val_reward_t, val_correct, val_total))
 					log_str += 'Step %d, %s, mm test loss: %f, Accuracy %f %%, reward: %f, reward_t: %f (%d/%d)\n' % (step, seq, val_loss, val_acc, val_reward, val_reward_t, val_correct, val_total)
 
@@ -1100,7 +1100,7 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 					else:
 						val_counting_reward_dict[seqc] = [val_correct,val_total,0]
 						
-					summary_writer.add_scalar('Val_loss_%s'%seq, val_loss, step)
+					# summary_writer.add_scalar('Val_loss_%s'%seq, val_loss, step)
 					print('Step %d, %s, mm validation loss: %f, Accuracy %f %%, reward: %f, reward_t: %f (%d/%d)' % (step, seq, val_loss,val_acc*100,val_reward,val_reward_t,val_correct,val_total))
 					log_str += 'Step %d, %s, mm validation loss: %f, Accuracy %f %%, reward: %f, reward_t: %f (%d/%d)\n' % (step, seq, val_loss,val_acc*100,val_reward,val_reward_t,val_correct,val_total)
 					end_time = time.time()
@@ -1255,8 +1255,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 
 				loss.backward()
 				loss=loss.detach()
-				if log:
-					summary_writer.add_scalar('Loss_%s'%seq, loss, step)
+				# if log:
+				# 	summary_writer.add_scalar('Loss_%s'%seq, loss, step)
 
 				fisher_loss_str = ''
 				for ti in range(len(args.full_seq)):
@@ -1433,7 +1433,11 @@ def on_task_update(model, task, task_id, seq_lst, batch_size, dl_lst, gpu_id):
 			loss = r.bdd(model, videos, gps, targets=labels, return_str_preds=True, sample_weights=sw)[1]
 			loss.backward()
 	elif task == 'socialiq':
+		k = 0
 		for i in dl_idx:
+			k += 1
+			if k > 5:
+				break
 			# print(seq_lst[i])
 			DL = DLS[i]
 			batch = next(DL)
@@ -1452,7 +1456,6 @@ def on_task_update(model, task, task_id, seq_lst, batch_size, dl_lst, gpu_id):
 					
 			loss = r.socialiq(model, ques, answers, videos, audios, trs, targets=labels, sample_weights=sample_weights, return_str_preds=True)[1]
 			loss.backward()
-
 
 	if tasks[0] == 'socialiq':
 		del dl_lst
