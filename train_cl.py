@@ -381,11 +381,11 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 						val_correct = 0
 						val_total = 0
 						val_reward = 0
-						k = 0
+						# k = 0
 						for b in val_dl:
-							k += 1
-							if k > 5:
-								break
+							# k += 1
+							# if k > 5:
+							# 	break
 							ques = b['ques']
 							answers = b['ans']
 							videos = b['videos']
@@ -473,11 +473,11 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 						val_total = 0
 						val_reward = 0
 						start_time = time.time()
-						k = 0
+						# k = 0
 						for b in val_dl: 
-							k += 1
-							if k > 5:
-								break
+							# k += 1
+							# if k > 5:
+							# 	break
 							ques = b['ques']
 							answers = b['ans']
 							videos = b['videos']
@@ -1292,10 +1292,10 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 	current_iterations[current_modality] += best_iteration
 	current_iterations['last'] += best_iteration
 
-	if tasks[0] == 'socialiq':
-		del dl_lst
-		del DLS
-		torch.cuda.empty_cache()
+	# if tasks[0] == 'socialiq':
+	# 	del dl_lst
+	# 	del DLS
+	# 	torch.cuda.empty_cache()
 
 	if model_save_path is not None:
 		with open(model_save_path + '.log', 'a') as f: #open(os.path.join(model_save_path, 'log.txt'), 'a') as f:
@@ -1433,11 +1433,11 @@ def on_task_update(model, task, task_id, seq_lst, batch_size, dl_lst, gpu_id):
 			loss = r.bdd(model, videos, gps, targets=labels, return_str_preds=True, sample_weights=sw)[1]
 			loss.backward()
 	elif task == 'socialiq':
-		k = 0
+		# k = 0
 		for i in dl_idx:
-			k += 1
-			if k > 5:
-				break
+			# k += 1
+			# if k > 5:
+			# 	break
 			# print(seq_lst[i])
 			DL = DLS[i]
 			batch = next(DL)
@@ -1457,10 +1457,10 @@ def on_task_update(model, task, task_id, seq_lst, batch_size, dl_lst, gpu_id):
 			loss = r.socialiq(model, ques, answers, videos, audios, trs, targets=labels, sample_weights=sample_weights, return_str_preds=True)[1]
 			loss.backward()
 
-	if tasks[0] == 'socialiq':
-		del dl_lst
-		del DLS
-		torch.cuda.empty_cache()
+	# if tasks[0] == 'socialiq':
+	# 	del dl_lst
+	# 	del DLS
+	# 	torch.cuda.empty_cache()
 
 	fisher_dict[task_id] = {}
 	optpar_dict[task_id] = {}
@@ -1610,8 +1610,8 @@ if __name__ == '__main__':
 			n_iters_lst = [1072*10+5, 1072*10+5, 879*10+5, 879*10+5]
 		else:
 			n_iters_lst = args.n_subtask_iters
-		eval_interval_lst = [25,25,25,25] #[1072,1072,879,879]
-		save_interval_lst = [25,25,25,25] #[1072,1072,879,879]
+		eval_interval_lst = [1072,1072,879,879]
+		save_interval_lst = [1072,1072,879,879]
 
 	if args.lambda_decay == None:
 		ewc_lambda_dict = None
@@ -1667,7 +1667,11 @@ if __name__ == '__main__':
 			# else:
 			dl_lst, val_dl_lst, test_dl_lst = None, None, None
 
-			train(shared_model, tasks[0], batch_sizes[0],
+			if tasks[0] == 'socialiq' and task_category_id == 3:
+				bs = int(batch_sizes[0]//2)
+			else:
+				bs = batch_sizes[0]
+			train(shared_model, tasks[0], bs,
 					 int(n_iters_lst[task_category_id] / n_jobs),
 					 gpu_id, start, restore, counters[0], barrier,
 					 args.n_workers,
