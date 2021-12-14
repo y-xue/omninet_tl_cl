@@ -93,7 +93,7 @@ parser.add_argument('--n_ewc_warmup', default=0, type=int, help='during warmup, 
 parser.add_argument('--full_seq', default='ITTIV', help='order of modalities')
 
 parser.add_argument('--restore_cl', default=-1, help='Step from which to restore model training')
-# parser.add_argument('--restore_cl_last', help='Restore the latest version of the model.', action='store_true')
+parser.add_argument('--restore_cl_last', help='Restore the latest version of the model.', action='store_true')
 
 parser.add_argument('--converge_window', default=10, type=int, help='Window size for convergence test')
 parser.add_argument('--safe_window', default=30, type=int, help='Never stop training in safe_window')
@@ -1607,11 +1607,12 @@ if __name__ == '__main__':
 		print('cl_tasks:', cl_tasks)
 		# n_iters_lst = [10005]*8 #, 10005, 10005, 10005, 10005]
 		if args.n_subtask_iters is None:
-			n_iters_lst = [1072*10+5, 1072*10+5, 879*10+5, 879*10+5]
+			n_iters_lst = [1072*2+5, 1072*2+5, 880*2+5, 880*2+5]
+			# n_iters_lst = [1072*10+5, 1072*10+5, 879*10+5, 879*10+5]
 		else:
 			n_iters_lst = args.n_subtask_iters
-		eval_interval_lst = [1072,1072,879,879]
-		save_interval_lst = [1072,1072,879,879]
+		eval_interval_lst = [1072//4,1072//4,880//4,880//4] #eval_interval_lst = [1072,1072,879,879]
+		save_interval_lst = [1072//4,1072//4,880//4,880//4]#save_interval_lst = [1072,1072,879,879]
 
 	if args.lambda_decay == None:
 		ewc_lambda_dict = None
@@ -1636,114 +1637,130 @@ if __name__ == '__main__':
 	else:
 		n_warmup_steps = args.n_warmup_steps
 
+	log_fns = glob.glob(args.model_save_path+'/task*.log')
+	if args.restore_cl_last and len(log_fns) > 0:
+		k = max([int(re.findall(r'.*task(\d+)_.*',fn)[0]) for fn in log_fns])
+		log_fns = glob.glob(args.model_save_path+'/task%s_*.log'%k)
+		task_category_id = max([int(re.findall(r'.*_(\d+).*',fn)[0]) for fn in log_fns])
+		task_category_id += 1
+
+		if task_category_id == len(cl_tasks):
+			task_category_id %= len(cl_tasks)
+			k += 1
+	else:
+		k = 0
+		task_category_id = 0
+		
 	last_model_save_path = ''
-	for k in range(n_iters):
-		for task_category_id, seq_lst in enumerate(cl_tasks):
-			task_id = k*len(args.full_seq) + task_category_id
+	seq_lst = cl_tasks[task_category_id]
+	# for k in range(n_iters):
+	# 	for task_category_id, seq_lst in enumerate(cl_tasks):
+
+	task_id = k*len(args.full_seq) + task_category_id
+	counters = [Counter(restore) for i in range(len(tasks))]
+
+	# train
+	print('training task:', task_category_id)
+	notest = True
+	test = False
+	test_on_val = False
+	gpu_id=0
+	model_save_path = args.model_save_path + '/task%s_%s'%(k,task_category_id)
+	if os.path.exists('%s.log'%model_save_path):
+		with open('%s.log'%model_save_path, 'r') as f:
+			log = f.read()
+		test_val_rewards = re.findall(r'Step 1,.*total test reward: (\d+\.\d+)', log)
+		if len(test_val_rewards) == 2 * len(args.full_seq) or (k == 0 and len(test_val_rewards) == 2* (len(args.full_seq[:(task_category_id+1)]))):
+			last_model_save_path = model_save_path
+			print('test results found. skip training.')
+			continue
+	if last_model_save_path != '':
+		shared_model.restore(last_model_save_path, 'best/0')
+
+	# if tasks[0] == 'socialiq':
+	# 	full_seq = 'QATV'
+	# 	predefined_sample_weights = dict(zip([str(x) for x in range(1,5)], [1.]*4))
+	# 	dl_lst, val_dl_lst, test_dl_lst = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=n_workers, batch_size=batch_size, val_batch_size=args.val_batch_size, clip_len=16, data_seed=args.data_seed)
+	# else:
+	dl_lst, val_dl_lst, test_dl_lst = None, None, None
+
+	if tasks[0] == 'socialiq' and task_category_id == 3:
+		bs = int(batch_sizes[0]//2)
+	else:
+		bs = batch_sizes[0]
+	train(shared_model, tasks[0], bs,
+			 int(n_iters_lst[task_category_id] / n_jobs),
+			 gpu_id, start, restore, counters[0], barrier,
+			 args.n_workers,
+			 save_interval_lst[task_category_id],
+			 eval_interval_lst[task_category_id],
+			 args.eval_first,
+			 True,
+			 args.peripherals_type, args.conf_type,
+			 model_save_path, args.move_out_path, args.save_best, args.testing,
+			 args.sample_idx_fn, seq_lst, args.rewarding, 
+			 args.random_seq, notest, test, test_on_val,
+			 args.use_sgd,
+			 task_id, task_category_id,
+			 ewc_lambda[task_category_id]*ewc_scales[k]*(task_id+1>args.n_ewc_warmup), 
+			 ewc_lambda_dict, k,
+			 n_warmup_steps[task_category_id],
+			 args.full_seq, None, None,
+			 dl_lst, val_dl_lst, test_dl_lst) #int(args.all_seed)+k) 
+			 # use args.all_seed+k to set a different seed for dataloader in a different pass
+			 # set to None for same seed
+
+	# use the best model
+	shared_model.restore(model_save_path, 'best/0')
+	
+	print('on_task_update task:', task_id)
+	start_time = time.time()
+	on_task_update(shared_model, tasks[0], task_category_id, seq_lst, batch_sizes[0], dl_lst, gpu_id=0)
+	print('on_task_update: %.2f'%(time.time() - start_time))
+
+	# test 
+	for test, test_on_val in [(True, True), (True, False)]:
+		# test = True
+		notest = False
+		test_reward_dict = {}
+
+		# if k == 0:
+		# 	test_tasks = cl_tasks[:(task_category_id+1)]
+		# else:
+		# 	test_tasks = cl_tasks
+		test_tasks = cl_tasks
+
+		for task_category_id_test, seq_lst_test in enumerate(test_tasks):
+			print('testing task:', task_category_id_test)
 			counters = [Counter(restore) for i in range(len(tasks))]
-
-			# train
-			print('training task:', task_category_id)
-			notest = True
-			test = False
-			test_on_val = False
-			gpu_id=0
-			model_save_path = args.model_save_path + '/task%s_%s'%(k,task_category_id)
-			if os.path.exists('%s.log'%model_save_path):
-				with open('%s.log'%model_save_path, 'r') as f:
-					log = f.read()
-				test_val_rewards = re.findall(r'Step 1,.*total test reward: (\d+\.\d+)', log)
-				if len(test_val_rewards) == 2 * len(args.full_seq) or (k == 0 and len(test_val_rewards) == 2* (len(args.full_seq[:(task_category_id+1)]))):
-					last_model_save_path = model_save_path
-					print('test results found. skip training.')
-					continue
-			if last_model_save_path != '':
-				shared_model.restore(last_model_save_path, 'best/0')
-
-			# if tasks[0] == 'socialiq':
-			# 	full_seq = 'QATV'
-			# 	predefined_sample_weights = dict(zip([str(x) for x in range(1,5)], [1.]*4))
-			# 	dl_lst, val_dl_lst, test_dl_lst = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=n_workers, batch_size=batch_size, val_batch_size=args.val_batch_size, clip_len=16, data_seed=args.data_seed)
-			# else:
-			dl_lst, val_dl_lst, test_dl_lst = None, None, None
-
-			if tasks[0] == 'socialiq' and task_category_id == 3:
-				bs = int(batch_sizes[0]//2)
-			else:
-				bs = batch_sizes[0]
-			train(shared_model, tasks[0], bs,
-					 int(n_iters_lst[task_category_id] / n_jobs),
+			train(shared_model, tasks[0], batch_sizes[0],
+					 int(n_iters_lst[task_category_id_test] / n_jobs),
 					 gpu_id, start, restore, counters[0], barrier,
 					 args.n_workers,
-					 save_interval_lst[task_category_id],
-					 eval_interval_lst[task_category_id],
+					 save_interval_lst[task_category_id_test],
+					 eval_interval_lst[task_category_id_test],
 					 args.eval_first,
 					 True,
 					 args.peripherals_type, args.conf_type,
 					 model_save_path, args.move_out_path, args.save_best, args.testing,
-					 args.sample_idx_fn, seq_lst, args.rewarding, 
+					 args.sample_idx_fn, seq_lst_test, args.rewarding,
 					 args.random_seq, notest, test, test_on_val,
 					 args.use_sgd,
-					 task_id, task_category_id,
+					 task_category_id_test, 
+					 task_category_id,
 					 ewc_lambda[task_category_id]*ewc_scales[k]*(task_id+1>args.n_ewc_warmup), 
 					 ewc_lambda_dict, k,
 					 n_warmup_steps[task_category_id],
-					 args.full_seq, None, None,
-					 dl_lst, val_dl_lst, test_dl_lst) #int(args.all_seed)+k) 
-					 # use args.all_seed+k to set a different seed for dataloader in a different pass
-					 # set to None for same seed
+					 args.full_seq,
+					 test_reward_dict, None,
+			 		 None, None, None)
 
-			# use the best model
-			shared_model.restore(model_save_path, 'best/0')
-			
-			print('on_task_update task:', task_id)
-			start_time = time.time()
-			on_task_update(shared_model, tasks[0], task_category_id, seq_lst, batch_sizes[0], dl_lst, gpu_id=0)
-			print('on_task_update: %.2f'%(time.time() - start_time))
+	with open(args.model_save_path + '/current_iterations.pkl', 'wb') as f:
+		pickle.dump(current_iterations, f)
 
-			# test 
-			for test, test_on_val in [(True, True), (True, False)]:
-				# test = True
-				notest = False
-				test_reward_dict = {}
-
-				# if k == 0:
-				# 	test_tasks = cl_tasks[:(task_category_id+1)]
-				# else:
-				# 	test_tasks = cl_tasks
-				test_tasks = cl_tasks
-
-				for task_category_id_test, seq_lst_test in enumerate(test_tasks):
-					print('testing task:', task_category_id_test)
-					counters = [Counter(restore) for i in range(len(tasks))]
-					train(shared_model, tasks[0], batch_sizes[0],
-							 int(n_iters_lst[task_category_id_test] / n_jobs),
-							 gpu_id, start, restore, counters[0], barrier,
-							 args.n_workers,
-							 save_interval_lst[task_category_id_test],
-							 eval_interval_lst[task_category_id_test],
-							 args.eval_first,
-							 True,
-							 args.peripherals_type, args.conf_type,
-							 model_save_path, args.move_out_path, args.save_best, args.testing,
-							 args.sample_idx_fn, seq_lst_test, args.rewarding,
-							 args.random_seq, notest, test, test_on_val,
-							 args.use_sgd,
-							 task_category_id_test, 
-							 task_category_id,
-							 ewc_lambda[task_category_id]*ewc_scales[k]*(task_id+1>args.n_ewc_warmup), 
-							 ewc_lambda_dict, k,
-							 n_warmup_steps[task_category_id],
-							 args.full_seq,
-							 test_reward_dict, None,
-					 		 None, None, None)
-
-			with open(args.model_save_path + '/current_iterations.pkl', 'wb') as f:
-				pickle.dump(current_iterations, f)
-
-			with open(args.model_save_path + '/fisher_dict.pkl', 'wb') as f:
-				pickle.dump(fisher_dict, f)
-			with open(args.model_save_path + '/optpar_dict.pkl', 'wb') as f:
-				pickle.dump(optpar_dict, f)
+	with open(args.model_save_path + '/fisher_dict.pkl', 'wb') as f:
+		pickle.dump(fisher_dict, f)
+	with open(args.model_save_path + '/optpar_dict.pkl', 'wb') as f:
+		pickle.dump(optpar_dict, f)
 
 	# shared_model.save(args.model_save_path, 'last')
