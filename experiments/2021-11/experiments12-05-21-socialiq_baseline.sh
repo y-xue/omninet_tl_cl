@@ -17,10 +17,9 @@ run(){
 	rm -r ${opath};
 }
 
-for s in 816 47 21 219
+for s in 21 219 722
 do
 	run $s 2 0.005 16000;
-	run $s 2 0.004 16000;
 done
 
 
