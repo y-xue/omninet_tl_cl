@@ -153,6 +153,11 @@ if os.path.exists(args.model_save_path + '/fisher_dict.pkl'):
 
 	with open(args.model_save_path + '/current_iterations.pkl', 'rb') as f:
 		current_iterations = pickle.load(f)
+
+	print('fisher_dict loaded')
+	print(fisher_dict.keys())
+	print(optpar_dict.keys())
+	print(current_iterations.keys())
 else:
 	fisher_dict = {}
 	optpar_dict = {}
@@ -1639,19 +1644,36 @@ if __name__ == '__main__':
 
 	log_fns = glob.glob(args.model_save_path+'/task*.log')
 	if args.restore_cl_last and len(log_fns) > 0:
+		print('restoring')
 		k = max([int(re.findall(r'.*task(\d+)_.*',fn)[0]) for fn in log_fns])
 		log_fns = glob.glob(args.model_save_path+'/task%s_*.log'%k)
 		task_category_id = max([int(re.findall(r'.*_(\d+).*',fn)[0]) for fn in log_fns])
-		task_category_id += 1
 
+		last_model_save_path = args.model_save_path + '/task%s_%s'%(k,task_category_id)
+		shared_model.restore(last_model_save_path, 'best/0')
+
+		# try:
+		# 	with open(args.model_save_path + '/current_iterations.pkl', 'rb') as f:
+		# 		current_iterations = pickle.load(f)
+
+		# 	with open(args.model_save_path + '/fisher_dict.pkl', 'rb') as f:
+		# 		fisher_dict = pickle.load(f)
+		# 	with open(args.model_save_path + '/optpar_dict.pkl', 'rb') as f:
+		# 		optpar_dict = pickle.load(f)
+		# except:
+		# 	...
+
+		task_category_id += 1
 		if task_category_id == len(cl_tasks):
 			task_category_id %= len(cl_tasks)
 			k += 1
 	else:
 		k = 0
 		task_category_id = 0
+
+	print('k', k)
+	print('task_category_id', task_category_id)
 		
-	last_model_save_path = ''
 	seq_lst = cl_tasks[task_category_id]
 	# for k in range(n_iters):
 	# 	for task_category_id, seq_lst in enumerate(cl_tasks):
@@ -1666,16 +1688,16 @@ if __name__ == '__main__':
 	test_on_val = False
 	gpu_id=0
 	model_save_path = args.model_save_path + '/task%s_%s'%(k,task_category_id)
-	if os.path.exists('%s.log'%model_save_path):
-		with open('%s.log'%model_save_path, 'r') as f:
-			log = f.read()
-		test_val_rewards = re.findall(r'Step 1,.*total test reward: (\d+\.\d+)', log)
-		if len(test_val_rewards) == 2 * len(args.full_seq) or (k == 0 and len(test_val_rewards) == 2* (len(args.full_seq[:(task_category_id+1)]))):
-			last_model_save_path = model_save_path
-			print('test results found. skip training.')
-			continue
-	if last_model_save_path != '':
-		shared_model.restore(last_model_save_path, 'best/0')
+	# if os.path.exists('%s.log'%model_save_path):
+	# 	with open('%s.log'%model_save_path, 'r') as f:
+	# 		log = f.read()
+	# 	test_val_rewards = re.findall(r'Step 1,.*total test reward: (\d+\.\d+)', log)
+	# 	if len(test_val_rewards) == 2 * len(args.full_seq) or (k == 0 and len(test_val_rewards) == 2* (len(args.full_seq[:(task_category_id+1)]))):
+	# 		last_model_save_path = model_save_path
+	# 		print('test results found. skip training.')
+	# 		continue
+	# if last_model_save_path != '':
+	# 	shared_model.restore(last_model_save_path, 'best/0')
 
 	# if tasks[0] == 'socialiq':
 	# 	full_seq = 'QATV'
