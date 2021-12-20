@@ -1694,18 +1694,18 @@ if __name__ == '__main__':
 	# if last_model_save_path != '':
 	# 	shared_model.restore(last_model_save_path, 'best/0')
 
-	if tasks[0] == 'socialiq':
-		full_seq = 'QATV'
-		predefined_sample_weights = dict(zip([str(x) for x in range(1,5)], [1.]*4))
-		dl_lst, val_dl_lst, test_dl_lst = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=n_workers, batch_size=batch_size, val_batch_size=args.val_batch_size, clip_len=16, data_seed=args.data_seed)
-	else:
-		dl_lst, val_dl_lst, test_dl_lst = None, None, None
-
 	if tasks[0] == 'socialiq' and task_category_id == 3:
 		bs = 20 #int(batch_sizes[0]//2)
 	else:
 		bs = batch_sizes[0]
-		
+
+	if tasks[0] == 'socialiq':
+		full_seq = 'QATV'
+		predefined_sample_weights = dict(zip([str(x) for x in range(1,5)], [1.]*4))
+		dl_lst, val_dl_lst, test_dl_lst = dl.social_iq_batchgen(socialiq_dir, socialiq_video_folder, full_seq, predefined_sample_weights, seq_lst=seq_lst, num_workers=args.n_workers, batch_size=bs, val_batch_size=args.val_batch_size, clip_len=16, data_seed=args.data_seed)
+	else:
+		dl_lst, val_dl_lst, test_dl_lst = None, None, None
+
 	train(shared_model, tasks[0], bs,
 			 int(n_iters_lst[task_category_id] / n_jobs),
 			 gpu_id, start, restore, counters[0], barrier,
