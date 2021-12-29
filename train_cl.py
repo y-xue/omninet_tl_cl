@@ -1639,29 +1639,52 @@ if __name__ == '__main__':
 
 	log_fns = glob.glob(args.model_save_path+'/task*.log')
 	if args.restore_cl_last and len(log_fns) > 0:
-		print('restoring')
+		
 		k = max([int(re.findall(r'.*task(\d+)_.*',fn)[0]) for fn in log_fns])
 		log_fns = glob.glob(args.model_save_path+'/task%s_*.log'%k)
 		task_category_id = max([int(re.findall(r'.*_(\d+).*',fn)[0]) for fn in log_fns])
 
 		last_model_save_path = args.model_save_path + '/task%s_%s'%(k,task_category_id)
-		shared_model.restore(last_model_save_path, 'best/0')
 
-		# try:
-		# 	with open(args.model_save_path + '/current_iterations.pkl', 'rb') as f:
-		# 		current_iterations = pickle.load(f)
+		while not os.path.exists(last_model_save_path + '_complete'):
+			task_category_id -= 1
+			if task_category_id < 0:
+				task_category_id += len(cl_tasks)
+				k -= 1
+			last_model_save_path = args.model_save_path + '/task%s_%s'%(k,task_category_id)
 
-		# 	with open(args.model_save_path + '/fisher_dict.pkl', 'rb') as f:
-		# 		fisher_dict = pickle.load(f)
-		# 	with open(args.model_save_path + '/optpar_dict.pkl', 'rb') as f:
-		# 		optpar_dict = pickle.load(f)
-		# except:
-		# 	...
+		if k < 0:
+			print('no completed model to restore. start from beginning.')
+			k = task_category_id = 0
+		else:
+			print('restoring', last_model_save_path)
+			shared_model.restore(last_model_save_path, 'best/0')
 
-		task_category_id += 1
-		if task_category_id == len(cl_tasks):
-			task_category_id %= len(cl_tasks)
-			k += 1
+			# try:
+			# 	with open(args.model_save_path + '/current_iterations.pkl', 'rb') as f:
+			# 		current_iterations = pickle.load(f)
+
+			# 	with open(args.model_save_path + '/fisher_dict.pkl', 'rb') as f:
+			# 		fisher_dict = pickle.load(f)
+			# 	with open(args.model_save_path + '/optpar_dict.pkl', 'rb') as f:
+			# 		optpar_dict = pickle.load(f)
+			# except:
+			# 	...
+
+			# keep only models at the last step
+			last2_task_category_id = task_category_id - 1
+			if last2_task_category_id < 0:
+				last2_task_category_id += len(cl_tasks)
+				k -= 1
+			if k >= 0:
+				last2_path = args.model_save_path+'/task%s_%s'%(k,last2_task_category_id)
+				if os.path.exists(last2_path):
+					shutil.rmtree(last2_path)
+
+			task_category_id += 1
+			if task_category_id == len(cl_tasks):
+				task_category_id %= len(cl_tasks)
+				k += 1
 	else:
 		k = 0
 		task_category_id = 0
@@ -1780,5 +1803,8 @@ if __name__ == '__main__':
 		pickle.dump(fisher_dict, f)
 	with open(args.model_save_path + '/optpar_dict.pkl', 'wb') as f:
 		pickle.dump(optpar_dict, f)
+
+	with open(model_save_path + '_complete', 'w') as f:
+		print('check', file=f)
 
 	# shared_model.save(args.model_save_path, 'last')
