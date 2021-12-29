@@ -1673,11 +1673,12 @@ if __name__ == '__main__':
 
 			# keep only models at the last step
 			last2_task_category_id = task_category_id - 1
+			last2_k = k
 			if last2_task_category_id < 0:
 				last2_task_category_id += len(cl_tasks)
-				k -= 1
-			if k >= 0:
-				last2_path = args.model_save_path+'/task%s_%s'%(k,last2_task_category_id)
+				last2_k -= 1
+			if last2_k >= 0:
+				last2_path = args.model_save_path+'/task%s_%s'%(last2_k,last2_task_category_id)
 				if os.path.exists(last2_path):
 					shutil.rmtree(last2_path)
 
