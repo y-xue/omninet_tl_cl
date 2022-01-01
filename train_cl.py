@@ -97,6 +97,7 @@ parser.add_argument('--restore_cl_last', help='Restore the latest version of the
 
 parser.add_argument('--converge_window', default=10, type=int, help='Window size for convergence test')
 parser.add_argument('--safe_window', default=30, type=int, help='Never stop training in safe_window')
+parser.add_argument('--subtask_epochs', default=[2], nargs='+', type=int, help='subtask epochs')
 parser.add_argument('--restore_opt', action='store_true', help='True if restore optimizer for each task.')
 parser.add_argument('--restore_opt_lr', action='store_true', help='True if restore learning rate for each task by modality.')
 parser.add_argument('--restore_opt_lr_all', action='store_true', help='True if restore learning rate for each task.')
@@ -1607,7 +1608,8 @@ if __name__ == '__main__':
 		print('cl_tasks:', cl_tasks)
 		# n_iters_lst = [10005]*8 #, 10005, 10005, 10005, 10005]
 		if args.n_subtask_iters is None:
-			n_iters_lst = [1072*2+5, 1072*2+5, 880*2+5, 880*2+5]
+			es = args.subtask_epochs
+			n_iters_lst = [1072*es[0]+5, 1072*es[1]+5, 880*es[2]+5, 880*es[3]+5]
 			# n_iters_lst = [1072*10+5, 1072*10+5, 879*10+5, 879*10+5]
 		else:
 			n_iters_lst = args.n_subtask_iters
