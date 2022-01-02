@@ -115,6 +115,7 @@ parser.add_argument('--unfreeze', default=[], nargs='+', type=str, help='indicat
 parser.add_argument('--logit_struct_periph_dim', default=512, type=int, help='logit_struct_periph_dim')
 parser.add_argument('--n_warmup_steps', default=16000, type=int, help='n_warmup_steps for ScheduledOptim')
 parser.add_argument('--large_seq_rewarding', action='store_true', help='evaluate only large sequences (> 1000 samples)')
+parser.add_argument('--full_seq', default=None, type=str, help='full sequence')
 
 args = parser.parse_args()
 
@@ -346,7 +347,10 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                 betas=(0.9, 0.98), eps=1e-09),
             512, args.n_warmup_steps,restore,max_lr=0.0001,init_lr=args.init_lr)
     elif task == 'socialiq':
-        full_seq = 'QATV'
+        if args.full_seq is None:
+            full_seq = 'QATV'
+        else:
+            full_seq = args.full_seq
         seq_lst = [full_seq[:(i+1)] for i in range(len(full_seq))]
 
         if sample_weights_fn is not None and os.path.exists(os.path.join(socialiq_dir, sample_weights_fn)):
@@ -655,8 +659,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                         total_reward_linear += val_reward_linear
                         
                     # summary_writer.add_scalar('Test_loss_%s'%seq, val_loss, step)
-                    print('Step %d, %s, SIQ test loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f' % (step, seq, val_loss, val_acc, val_reward, val_reward_linear))
-                    log_str += 'Step %d, %s, SIQ test loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f\n' % (step, seq, val_loss, val_acc, val_reward, val_reward_linear)
+                    print('Step %d, %s, SIQ test loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f (%d/%d)' % (step, seq, val_loss, val_acc, val_reward, val_reward_linear, val_correct, val_total))
+                    log_str += 'Step %d, %s, SIQ test loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f (%d/%d)\n' % (step, seq, val_loss, val_acc, val_reward, val_reward_linear, val_correct, val_total)
 
                 print('-' * 100)
                 log_str += '-' * 100 + '\n'
@@ -720,8 +724,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
                         total_reward_linear += val_reward_linear
                         
                     # summary_writer.add_scalar('Val_loss_%s'%seq, val_loss, step)
-                    print('Step %d, %s, SIQ validation loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f' % (step, seq, val_loss,val_acc*100,val_reward,val_reward_linear))
-                    log_str += 'Step %d, %s, SIQ validation loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f\n' % (step, seq, val_loss,val_acc*100,val_reward,val_reward_linear)
+                    print('Step %d, %s, SIQ validation loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f (%d/%d)' % (step, seq, val_loss,val_acc*100,val_reward,val_reward_linear, val_correct, val_total))
+                    log_str += 'Step %d, %s, SIQ validation loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f (%d/%d)\n' % (step, seq, val_loss,val_acc*100,val_reward,val_reward_linear, val_correct, val_total)
                     end_time = time.time()
                     print('Step {}, {}, validation takes {:.2f}s\n'.format(step, seq, end_time - start_time))
                     log_str += 'Step {}, {}, validation takes {:.2f}s\n'.format(step, seq, end_time - start_time)
