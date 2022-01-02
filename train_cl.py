@@ -428,8 +428,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 								test_reward_dict[seq] = [val_correct, val_total, 0]
 
 						# summary_writer.add_scalar('Test_loss_%s'%seq, val_loss, step)
-						print('Step %d, %s, SIQ test loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f' % (step, seq, val_loss, val_acc, val_reward, val_reward_linear))
-						log_str += 'Step %d, %s, SIQ test loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f\n' % (step, seq, val_loss, val_acc, val_reward, val_reward_linear)
+						print('Step %d, %s, SIQ test loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f (%d/%d)' % (step, seq, val_loss, val_acc, val_reward, val_reward_linear, val_correct, val_total))
+						log_str += 'Step %d, %s, SIQ test loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f (%d/%d)\n' % (step, seq, val_loss, val_acc, val_reward, val_reward_linear, val_correct, val_total)
 
 					if test_reward_dict is not None:
 						print('-'*100)
@@ -513,8 +513,8 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 							total_reward_linear += val_reward_linear
 							
 						# summary_writer.add_scalar('Val_loss_%s'%seq, val_loss, step)
-						print('Step %d, %s, SIQ validation loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f' % (step, seq, val_loss,val_acc*100,val_reward,val_reward_linear))
-						log_str += 'Step %d, %s, SIQ validation loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f\n' % (step, seq, val_loss,val_acc*100,val_reward,val_reward_linear)
+						print('Step %d, %s, SIQ validation loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f (%d/%d)' % (step, seq, val_loss,val_acc*100,val_reward,val_reward_linear, val_correct))
+						log_str += 'Step %d, %s, SIQ validation loss: %f, Accuracy %f %%, reward: %f, reward_linear: %f (%d/%d)\n' % (step, seq, val_loss,val_acc*100,val_reward,val_reward_linear, val_total)
 						end_time = time.time()
 						print('Step {}, {}, validation takes {:.2f}s\n'.format(step, seq, end_time - start_time))
 						log_str += 'Step {}, {}, validation takes {:.2f}s\n'.format(step, seq, end_time - start_time)
