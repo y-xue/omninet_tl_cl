@@ -349,10 +349,11 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
     elif task == 'socialiq':
         if args.full_seq is None:
             full_seq = 'QATV'
+            seq_lst = [full_seq[:(i+1)] for i in range(len(full_seq))]
         else:
             full_seq = args.full_seq
-        seq_lst = [full_seq[:(i+1)] for i in range(len(full_seq))]
-
+            seq_lst = [full_seq]
+        
         if sample_weights_fn is not None and os.path.exists(os.path.join(socialiq_dir, sample_weights_fn)):
             with open(os.path.join(socialiq_dir, sample_weights_fn), 'r') as f:
                 predefined_sample_weights = json.load(f)
