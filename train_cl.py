@@ -102,6 +102,7 @@ parser.add_argument('--restore_opt', action='store_true', help='True if restore 
 parser.add_argument('--restore_opt_lr', action='store_true', help='True if restore learning rate for each task by modality.')
 parser.add_argument('--restore_opt_lr_all', action='store_true', help='True if restore learning rate for each task.')
 parser.add_argument('--no_penalty_on_same_modality', action='store_true', help='True if use ewc_lambda = 0 on tasks ending with the same modality.')
+parser.add_argument('--lr_decay', default=0, type=int, help='1 if use learning rate decay per subtask; 0 otherwise.')
 
 
 
@@ -230,18 +231,25 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 			safe_window = args.safe_window
 			converge_window = args.converge_window
 	if task == 'socialiq':
-        if current_modality == 'A':
-                safe_window = 40
-                converge_window = 10
-        elif current_modality == 'T':
-                safe_window = 10
-                converge_window = 5
-        elif current_modality == 'T':
-                safe_window = 10
-                converge_window = 5
+        if current_modality == 'V':
+            safe_window = 10
+            converge_window = 20
         else:
-                safe_window = args.safe_window
-                converge_window = args.converge_window
+            safe_window = args.safe_window
+            converge_window = args.converge_window
+	# if task == 'socialiq':
+ #        if current_modality == 'A':
+ #                safe_window = 40
+ #                converge_window = 10
+ #        elif current_modality == 'T':
+ #                safe_window = 10
+ #                converge_window = 5
+ #        elif current_modality == 'T':
+ #                safe_window = 10
+ #                converge_window = 5
+ #        else:
+ #                safe_window = args.safe_window
+ #                converge_window = args.converge_window
 
 	if task == 'socialiq':
 		full_seq = 'QATV'
@@ -253,11 +261,15 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 		DLS = [iter(cycle(tr_dl)) for tr_dl in dl_lst]
 		dl_ids = iter(cycle(range(len(dl_lst))))
 
+		overall_scale = 1
+		if args.lr_decay == 1:
+			overall_scale = 1/(repeat+1)
 		optimizer = ScheduledOptim(
 			Adam(
 				filter(lambda x: x.requires_grad, shared_model.parameters()),
 				betas=(0.9, 0.98), eps=1e-09),
-			512, n_warmup_steps,restore,max_lr=0.0001,init_lr=args.init_lr)
+			512, n_warmup_steps,restore,max_lr=0.0001,init_lr=args.init_lr,
+			overall_scale=overall_scale)
 
 	if task == 'bdd':
 		full_seq = 'GGGVGVVV'

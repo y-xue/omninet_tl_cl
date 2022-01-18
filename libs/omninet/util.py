@@ -231,13 +231,14 @@ def print_gradient(x, name):
 class ScheduledOptim():
     '''A simple wrapper class for learning rate scheduling'''
 
-    def __init__(self, optimizer, d_model, n_warmup_steps,n_current_steps=0,init_lr=0.1,max_lr=None):
+    def __init__(self, optimizer, d_model, n_warmup_steps,n_current_steps=0,init_lr=0.1,max_lr=None,overall_scale=1):
         self._optimizer = optimizer
         self.n_warmup_steps = n_warmup_steps
         self.n_current_steps = n_current_steps
         self.init_lr = init_lr
         self.hidden_size=d_model
         self.max_lr=max_lr
+        self.overall_scale=overall_scale
     def step(self):
         "Step with the inner optimizer"
         self._update_learning_rate()
@@ -261,7 +262,7 @@ class ScheduledOptim():
         else:
             lr = self.init_lr * self._get_lr_scale()
         for param_group in self._optimizer.param_groups:
-            param_group['lr'] = lr
+            param_group['lr'] = lr * self.overall_scale
     
     def set_current_step(self, n):
         self.n_current_steps = n
