@@ -231,12 +231,12 @@ def train(shared_model, task, batch_size, train_steps, gpu_id, start,  restore, 
 			safe_window = args.safe_window
 			converge_window = args.converge_window
 	if task == 'socialiq':
-        if current_modality == 'V':
-            safe_window = 10
-            converge_window = 20
-        else:
-            safe_window = args.safe_window
-            converge_window = args.converge_window
+		if current_modality == 'V':
+			safe_window = 10
+			converge_window = 20
+		else:
+			safe_window = args.safe_window
+			converge_window = args.converge_window
 	# if task == 'socialiq':
  #        if current_modality == 'A':
  #                safe_window = 40
