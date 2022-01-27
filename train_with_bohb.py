@@ -63,7 +63,7 @@ print('NameServer started')
 # the same run_id as above. After that, we can start the worker in the background,
 # where it will wait for incoming configurations to evaluate.
 w = MyWorker(nameserver='127.0.0.1',nameserver_port=args.port,run_id=str(args.seed),
-	seed=args.seed,out_path=args.out_path,data_path=args.data_path,
+	seed=args.seed,move_out=args.move_out,out_path=args.out_path,data_path=args.data_path,
 	seq=args.seq,task=args.task,
 	save_intvl=args.save_intvl,eval_intvl=args.eval_intvl,
 	batch_size=args.batch_size,val_batch_size=args.val_batch_size,
